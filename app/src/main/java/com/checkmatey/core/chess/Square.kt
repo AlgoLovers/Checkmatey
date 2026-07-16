@@ -14,6 +14,10 @@ data class Square(val file: Int, val rank: Int) {
     val name: String
         get() = "${'a' + file}${rank + 1}"
 
+    /** Index 0..63 into a rank-major board array (index = rank * 8 + file). */
+    val index: Int
+        get() = rank * 8 + file
+
     companion object {
         /** Parses an algebraic square name such as "e4". */
         fun fromName(name: String): Square {

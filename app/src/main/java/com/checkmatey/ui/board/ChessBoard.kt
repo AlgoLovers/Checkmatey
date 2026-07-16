@@ -15,17 +15,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
-import com.checkmatey.core.chess.Board
+import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
 import com.checkmatey.ui.theme.BoardDark
 import com.checkmatey.ui.theme.BoardLight
 
 /**
- * Renders an 8x8 board with the pieces from [board]. Stays square via [aspectRatio],
+ * Renders an 8x8 board with the pieces from [position]. Stays square via [aspectRatio],
  * so it scales cleanly from phone to tablet — the caller decides the width.
  */
 @Composable
-fun ChessBoard(board: Board, modifier: Modifier = Modifier) {
+fun ChessBoard(position: Position, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier.aspectRatio(1f)) {
         val cellSize = maxWidth / 8
         val glyphSize = with(LocalDensity.current) { (cellSize * 0.72f).toSp() }
@@ -42,7 +42,7 @@ fun ChessBoard(board: Board, modifier: Modifier = Modifier) {
                                 .background(if (isLight) BoardLight else BoardDark),
                             contentAlignment = Alignment.Center,
                         ) {
-                            board.pieceAt(square)?.let { piece ->
+                            position.pieceAt(square)?.let { piece ->
                                 Text(
                                     text = piece.glyph.toString(),
                                     fontSize = glyphSize,

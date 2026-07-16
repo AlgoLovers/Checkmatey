@@ -1,7 +1,12 @@
 package com.checkmatey.core.chess
 
 /** Side to move / piece owner. */
-enum class PieceColor { WHITE, BLACK }
+enum class PieceColor {
+    WHITE,
+    BLACK;
+
+    fun opposite(): PieceColor = if (this == WHITE) BLACK else WHITE
+}
 
 /** The six chess piece types. [letter] is the lowercase FEN letter. */
 enum class PieceType(val letter: Char) {

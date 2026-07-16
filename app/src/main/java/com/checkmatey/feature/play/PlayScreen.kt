@@ -10,16 +10,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.checkmatey.core.chess.Board
+import com.checkmatey.core.chess.Position
 import com.checkmatey.ui.board.ChessBoard
 
 /**
  * Play tab. For now it shows the starting position; interactive move handling and
- * the pure-Kotlin move engine land in later loop iterations.
+ * the level-based engine land in later loop iterations.
  */
 @Composable
 fun PlayScreen(modifier: Modifier = Modifier) {
-    val board = remember { Board.startingPosition() }
+    val position = remember { Position.startingPosition() }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -28,7 +28,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     ) {
         // Cap the board on large screens (tablet) so it doesn't stretch edge to edge.
         ChessBoard(
-            board = board,
+            position = position,
             modifier = Modifier
                 .widthIn(max = 560.dp)
                 .fillMaxWidth(),
