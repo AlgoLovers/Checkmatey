@@ -1,0 +1,9 @@
+<resources>
+    <!-- Base platform theme; Compose draws the actual Material 3 UI on top.
+         Using the built-in platform theme avoids pulling in the legacy Material Components library. -->
+    <style name="Theme.Checkmatey" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>

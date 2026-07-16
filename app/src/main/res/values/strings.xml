@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Checkmatey</string>
+    <string name="nav_learn">Learn</string>
+    <string name="nav_play">Play</string>
+    <string name="nav_puzzles">Puzzles</string>
+    <string name="nav_profile">Profile</string>
+</resources>

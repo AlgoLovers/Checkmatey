@@ -1,0 +1,43 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android / IntelliJ / Android Studio
+*.iml
+.idea/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# Signing / secrets — never commit
+*.jks
+*.keystore
+keystore.properties
+*.p12
+*.pem
+.env
+.env.*
+secrets.properties
+
+# Build outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+output.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Loop engineering: keep the contracts (LOOP.md, STATE.md, loop-constraints.md),
+# but ignore transient run logs and per-run ledgers.
+loop-run-log.md
+.loop/

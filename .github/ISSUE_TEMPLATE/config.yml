@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 프로젝트 규칙 (CLAUDE.md)
+    url: https://github.com/AlgoLovers/Checkmatey/blob/main/CLAUDE.md
+    about: 기여/에이전트 규칙, 완료 기준, 안전 규칙은 여기.
