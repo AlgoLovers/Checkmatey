@@ -23,7 +23,7 @@ jobs:
     # 시크릿이 없으면 자동 실행에서도 조용히 건너뛴다.
     if: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run Claude Code triage (read-only)
         uses: anthropics/claude-code-action@v1
