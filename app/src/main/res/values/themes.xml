@@ -4,6 +4,8 @@
     <style name="Theme.Checkmatey" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- Edge-to-edge (incl. display cutout handling) is set at runtime via enableEdgeToEdge(). -->
+        <!-- windowLayoutInDisplayCutoutMode is intentionally omitted here: it needs API 27, minSdk is 24. -->
+        <!-- If cutout tuning is needed, override it in res/values-v27/themes.xml. -->
     </style>
 </resources>
