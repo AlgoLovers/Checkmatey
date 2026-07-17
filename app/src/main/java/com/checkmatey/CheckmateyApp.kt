@@ -23,7 +23,7 @@ import com.checkmatey.feature.study.StudyScreen
 private enum class TopDestination(val label: String, val icon: ImageVector) {
     LEARN("명국", Icons.Filled.Star),
     PLAY("Play", Icons.Filled.PlayArrow),
-    PUZZLES("Puzzles", Icons.Filled.Search),
+    PUZZLES("퍼즐", Icons.Filled.Search),
     PROFILE("분석", Icons.Filled.Person),
 }
 
