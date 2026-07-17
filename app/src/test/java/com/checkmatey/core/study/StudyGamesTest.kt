@@ -10,9 +10,11 @@ class StudyGamesTest {
 
     @Test
     fun bundlesTheExpectedGames() {
-        assertEquals(3, games.size)
+        assertEquals(5, games.size)
         assertTrue(games.any { it.meta.white.contains("Morphy") })
         assertTrue(games.any { it.meta.white.contains("Anderssen") })
+        assertTrue(games.any { it.meta.white.contains("Legal") })
+        assertTrue(games.any { it.meta.white.contains("Reti") })
     }
 
     @Test
