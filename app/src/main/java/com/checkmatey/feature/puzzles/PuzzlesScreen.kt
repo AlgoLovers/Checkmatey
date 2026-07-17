@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.checkmatey.core.chess.Move
 import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.chess.toSan
@@ -68,6 +69,9 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     val solution = remember(puzzle) { engine.bestMove(puzzle.position, 4) }
     var selected by remember { mutableStateOf<Square?>(null) }
     var state by remember { mutableStateOf(PuzzleState.SOLVING) }
+    // The board shows the puzzle position while solving; on solve/miss it plays the solution move.
+    var displayPos by remember(puzzle) { mutableStateOf(puzzle.position) }
+    var lastMove by remember { mutableStateOf<Move?>(null) }
 
     val position = puzzle.position
     val targets: Set<Square> = if (state == PuzzleState.SOLVING) {
@@ -75,8 +79,6 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     } else {
         emptySet()
     }
-    val hintSquares: Set<Square> =
-        if (state == PuzzleState.FAILED && solution != null) setOf(solution.from, solution.to) else emptySet()
 
     fun loadNext() {
         solvedIds = solvedIds + puzzle.id
@@ -87,6 +89,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             themeFilter = if (focusWeakness) weakest else null,
         )
         selected = null
+        lastMove = null
         state = PuzzleState.SOLVING
     }
 
@@ -131,6 +134,8 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             reviewIds = (reviewIds + puzzle.id).also { store.reviewIds = it } // missed -> review later
             state = PuzzleState.FAILED
         }
+        // Play the solution move on the board (animated) so the right move is always shown.
+        solution?.let { displayPos = puzzle.position.applyMove(it); lastMove = it }
         weakest = store.weakestTheme()
     }
 
@@ -161,11 +166,11 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             BoxWithConstraints {
                 val side = minOf(maxWidth, maxHeight).coerceAtMost(520.dp)
                 ChessBoard(
-                    position = position,
+                    position = displayPos,
                     modifier = Modifier.size(side),
                     selected = selected,
                     targets = targets,
-                    hintSquares = hintSquares,
+                    lastMove = lastMove,
                     onSquareClick = if (state == PuzzleState.SOLVING) ::onSquareClick else null,
                 )
             }

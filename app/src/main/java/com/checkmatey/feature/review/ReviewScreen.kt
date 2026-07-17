@@ -48,7 +48,8 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifier: Modifier = Modifier) {
-    val annotator = remember { Annotator(KotlinMinimaxEngine(), depth = 2) }
+    // Depth 3 + the engine's quiescence search makes the per-move verdicts noticeably more accurate.
+    val annotator = remember { Annotator(KotlinMinimaxEngine(), depth = 3) }
     val reviewer = remember { GameReviewer(annotator) }
 
     var annotations by remember { mutableStateOf<List<MoveAnnotation>?>(null) }

@@ -65,12 +65,12 @@ fun ChessBoard(
         val glyphSize = with(LocalDensity.current) { (cell * 0.72f).toSp() }
 
         // Slide the last-moved piece from its origin to its destination.
-        val progress = remember { Animatable(1f) }
+        // Key the Animatable to lastMove so it resets to 0 *in the same composition* the new
+        // position arrives — otherwise the piece flashes at the destination for a frame, jumps
+        // back to the origin, then slides (the reported flicker).
+        val progress = remember(lastMove) { Animatable(if (lastMove == null) 1f else 0f) }
         LaunchedEffect(lastMove) {
-            if (lastMove != null) {
-                progress.snapTo(0f)
-                progress.animateTo(1f, animationSpec = tween(durationMillis = 180))
-            }
+            if (lastMove != null) progress.animateTo(1f, animationSpec = tween(durationMillis = 180))
         }
         val animating = lastMove != null && progress.value < 1f
 

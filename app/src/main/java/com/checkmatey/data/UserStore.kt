@@ -27,6 +27,14 @@ class UserStore(context: Context) {
         get() = prefs.getInt(KEY_BEST_STREAK, 0)
         set(value) = prefs.edit().putInt(KEY_BEST_STREAK, value).apply()
 
+    var soundOn: Boolean
+        get() = prefs.getBoolean(KEY_SOUND, true)
+        set(value) = prefs.edit().putBoolean(KEY_SOUND, value).apply()
+
+    var onboardingSeen: Boolean
+        get() = prefs.getBoolean(KEY_ONBOARDED, false)
+        set(value) = prefs.edit().putBoolean(KEY_ONBOARDED, value).apply()
+
     /** Ids of previously-missed puzzles, queued for spaced-repetition review. */
     var reviewIds: List<String>
         get() = prefs.getString(KEY_REVIEW, "").orEmpty().split(",").filter { it.isNotBlank() }
@@ -70,5 +78,7 @@ class UserStore(context: Context) {
         const val KEY_BEST_STREAK = "bestStreak"
         const val KEY_REVIEW = "reviewIds"
         const val KEY_THEMES = "themeStats"
+        const val KEY_SOUND = "soundOn"
+        const val KEY_ONBOARDED = "onboardingSeen"
     }
 }

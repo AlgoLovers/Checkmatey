@@ -55,6 +55,8 @@ import com.checkmatey.core.engine.MoveQuality
 import com.checkmatey.core.study.StudyGames
 import com.checkmatey.data.UserStore
 import com.checkmatey.feature.review.ReviewScreen
+import com.checkmatey.sound.Sfx
+import com.checkmatey.sound.SoundFx
 import com.checkmatey.ui.board.ChessBoard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -76,11 +78,14 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val userRating = remember { UserStore(context).puzzleRating }
+    val store = remember { UserStore(context) }
+    val userRating = remember { store.puzzleRating }
+    val soundFx = remember { SoundFx() }
     val humanColor = PieceColor.WHITE
 
     var level by rememberSaveable { mutableStateOf(BotLevel.BEGINNER) }
     var adaptive by rememberSaveable { mutableStateOf(false) }
+    var soundOn by remember { mutableStateOf(store.soundOn) }
     var position by rememberSaveable(stateSaver = PositionSaver) { mutableStateOf(Position.startingPosition()) }
     var selected by remember { mutableStateOf<Square?>(null) }
     var lastMove by remember { mutableStateOf<Move?>(null) }
@@ -107,11 +112,22 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     val effectiveLevel = if (adaptive) BotLevel.forRating(userRating) else level
 
     fun applyMove(move: Move) {
+        val capture = position.pieceAt(move.to) != null || move.isEnPassant
         position = position.applyMove(move)
         moves.add(move)
         lastMove = move
         hint = null
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        if (soundOn) {
+            soundFx.play(
+                when {
+                    position.isCheckmate() -> if (position.sideToMove == humanColor) Sfx.LOSE else Sfx.WIN
+                    position.isInCheck() -> Sfx.CHECK
+                    capture -> Sfx.CAPTURE
+                    else -> Sfx.MOVE
+                },
+            )
+        }
     }
 
     fun newGame() {
@@ -175,7 +191,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         StatusCard(position = position, humanColor = humanColor, thinking = thinking, isStart = isStart)
         Spacer(Modifier.height(8.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -185,6 +201,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             ) { Text("💡 힌트") }
             Toggle(label = "코치", on = coachOn, onChange = { coachOn = it; if (!it) feedback = null })
             Toggle(label = "적응", on = adaptive, onChange = { adaptive = it })
+            Toggle(label = "소리", on = soundOn, onChange = { soundOn = it; store.soundOn = it })
         }
         Spacer(Modifier.height(8.dp))
 

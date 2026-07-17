@@ -18,10 +18,15 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import com.checkmatey.data.UserStore
+import com.checkmatey.feature.onboarding.OnboardingScreen
 import com.checkmatey.feature.play.PlayScreen
 import com.checkmatey.feature.profile.ProfileScreen
 import com.checkmatey.feature.puzzles.PuzzlesScreen
@@ -43,27 +48,35 @@ private enum class TopDestination(val label: String, val icon: ImageVector) {
  */
 @Composable
 fun CheckmateyApp() {
+    val context = LocalContext.current
+    val store = remember { UserStore(context) }
+    var onboarded by rememberSaveable { mutableStateOf(store.onboardingSeen) }
+    if (!onboarded) {
+        OnboardingScreen(onDone = { store.onboardingSeen = true; onboarded = true })
+        return
+    }
+
     var selectedIndex by rememberSaveable { mutableIntStateOf(TopDestination.PLAY.ordinal) }
     val current = TopDestination.entries[selectedIndex]
 
-    NavigationSuiteScaffold(
-        navigationSuiteItems = {
-            TopDestination.entries.forEach { dest ->
-                item(
-                    selected = dest == current,
-                    onClick = { selectedIndex = dest.ordinal },
-                    icon = { Icon(dest.icon, contentDescription = dest.label) },
-                    label = { Text(dest.label) },
-                )
-            }
-        },
+    // Apply the status bar / cutout / (tablet) rail insets *around* the scaffold, so they aren't
+    // already consumed by the time content is laid out. The bottom nav bar keeps the bottom inset.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
     ) {
-        // Keep content clear of the status bar / display cutout / (tablet) nav rail.
-        // The bottom nav bar's inset is handled by the scaffold itself.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+        NavigationSuiteScaffold(
+            navigationSuiteItems = {
+                TopDestination.entries.forEach { dest ->
+                    item(
+                        selected = dest == current,
+                        onClick = { selectedIndex = dest.ordinal },
+                        icon = { Icon(dest.icon, contentDescription = dest.label) },
+                        label = { Text(dest.label) },
+                    )
+                }
+            },
         ) {
             when (current) {
                 TopDestination.LEARN -> StudyScreen()
