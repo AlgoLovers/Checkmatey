@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
@@ -47,6 +49,9 @@ import com.checkmatey.ui.theme.BoardLight
  * dark edge, black bodies with a light edge) so both are easy to read on any square. The most
  * recent move's squares are tinted, and the moved piece slides from origin to destination.
  *
+ * Files (a–h) and ranks (1–8) are labelled on the board edges, so instructions like
+ * "e2 폰을 e4로" can actually be followed by someone who has never read chess notation.
+ *
  * @param lastMove the move to highlight and animate; null on a fresh board.
  * @param onSquareClick invoked with the tapped square; null makes the board display-only.
  */
@@ -63,6 +68,7 @@ fun ChessBoard(
     BoxWithConstraints(modifier.aspectRatio(1f)) {
         val cell = maxWidth / 8
         val glyphSize = with(LocalDensity.current) { (cell * 0.72f).toSp() }
+        val coordSize = with(LocalDensity.current) { (cell * 0.20f).toSp() }
 
         // Slide the last-moved piece from its origin to its destination.
         // Key the Animatable to lastMove so it resets to 0 *in the same composition* the new
@@ -92,6 +98,22 @@ fun ChessBoard(
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {
+                            // Coordinate labels on the edges: files along the bottom, ranks on the left.
+                            val labelColor = if (isLight) BoardDark else BoardLight
+                            if (rank == 0) {
+                                Text(
+                                    text = ('a' + file).toString(),
+                                    modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 2.dp),
+                                    style = TextStyle(fontSize = coordSize, color = labelColor, fontWeight = FontWeight.Bold),
+                                )
+                            }
+                            if (file == 0) {
+                                Text(
+                                    text = (rank + 1).toString(),
+                                    modifier = Modifier.align(Alignment.TopStart).padding(horizontal = 2.dp),
+                                    style = TextStyle(fontSize = coordSize, color = labelColor, fontWeight = FontWeight.Bold),
+                                )
+                            }
                             when {
                                 square == selected ->
                                     Box(Modifier.matchParentSize().background(BoardHighlight.copy(alpha = 0.55f)))

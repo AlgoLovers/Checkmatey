@@ -35,6 +35,19 @@ class UserStore(context: Context) {
         get() = prefs.getBoolean(KEY_ONBOARDED, false)
         set(value) = prefs.edit().putBoolean(KEY_ONBOARDED, value).apply()
 
+    /**
+     * Recent finished games, newest first, as "result|uci,uci,...". Kept small (10) — this is a
+     * review aid, not an archive.
+     */
+    var recentGames: List<String>
+        get() = prefs.getString(KEY_GAMES, "").orEmpty().split(";").filter { it.isNotBlank() }
+        set(value) = prefs.edit().putString(KEY_GAMES, value.take(10).joinToString(";")).apply()
+
+    fun saveGame(result: String, uciMoves: List<String>) {
+        if (uciMoves.isEmpty()) return
+        recentGames = listOf("$result|${uciMoves.joinToString(",")}") + recentGames
+    }
+
     /** Ids of lessons the user has finished. */
     var completedLessons: Set<String>
         get() = prefs.getString(KEY_LESSONS, "").orEmpty().split(",").filter { it.isNotBlank() }.toSet()
@@ -86,5 +99,6 @@ class UserStore(context: Context) {
         const val KEY_SOUND = "soundOn"
         const val KEY_ONBOARDED = "onboardingSeen"
         const val KEY_LESSONS = "completedLessons"
+        const val KEY_GAMES = "recentGames"
     }
 }

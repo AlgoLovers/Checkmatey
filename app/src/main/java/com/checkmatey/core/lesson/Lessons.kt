@@ -28,6 +28,36 @@ object Lessons {
 
     val ALL: List<Lesson> = listOf(
         Lesson(
+            id = "coords",
+            title = "칸 이름 읽기",
+            subtitle = "a~h · 1~8 — 가장 먼저 배울 것",
+            steps = listOf(
+                LessonStep(
+                    fen = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1",
+                    instruction = "체스판의 모든 칸에는 이름이 있어요.\n" +
+                        "가로줄 = 알파벳 a~h (보드 아래에 표시)\n세로줄 = 숫자 1~8 (보드 왼쪽에 표시)\n\n" +
+                        "이름은 '알파벳+숫자' 순서입니다. 예: e2 = a부터 e번째 세로줄, 아래에서 2번째 가로줄.\n" +
+                        "지금 e2에 있는 흰 폰을 e3(한 칸 위)로 옮겨보세요.",
+                    acceptUci = setOf("e2e3"),
+                    explain = "정확해요! 칸 이름은 '알파벳(왼→오른쪽)' + '숫자(아래→위)'입니다.",
+                ),
+                LessonStep(
+                    fen = "4k3/8/8/8/8/8/1P6/4K3 w - - 0 1",
+                    instruction = "이번엔 b2 폰입니다. b = 왼쪽에서 두 번째 세로줄, 2 = 아래에서 두 번째 가로줄.\n" +
+                        "보드 가장자리의 글자와 숫자를 보고 b2 폰을 b4로 (두 칸) 옮겨보세요.",
+                    acceptUci = setOf("b2b4"),
+                    explain = "훌륭해요! 이제 앱이 'e4로 두세요'라고 하면 어디인지 바로 찾을 수 있습니다.",
+                ),
+                LessonStep(
+                    fen = "4k3/8/8/8/8/8/8/4K2R w K - 0 1",
+                    instruction = "마지막 연습: 오른쪽 아래 구석의 룩은 h1에 있습니다.\n" +
+                        "이 룩을 h8(같은 세로줄 맨 위)로 끝까지 올려보세요.",
+                    acceptUci = setOf("h1h8"),
+                    explain = "완벽! 같은 알파벳 = 같은 세로줄. 이제 모든 레슨의 지시를 따라갈 수 있습니다.",
+                ),
+            ),
+        ),
+        Lesson(
             id = "pawn",
             title = "폰 다루기",
             subtitle = "전진 · 잡기 · 승격",

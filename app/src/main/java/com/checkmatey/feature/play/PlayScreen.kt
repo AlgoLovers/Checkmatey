@@ -265,6 +265,18 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         }
     }
 
+    // Save every finished game so the 분석 tab can offer it for review.
+    LaunchedEffect(gameEnded, moves.size) {
+        if (gameEnded && moves.isNotEmpty()) {
+            val result = when {
+                position.isCheckmate() && position.sideToMove == humanColor -> "패배"
+                position.isCheckmate() -> "승리"
+                else -> "무승부"
+            }
+            store.saveGame(result, moves.map { it.uci() })
+        }
+    }
+
     if (gameEnded && !gameOverSeen) {
         val (title, detail) = gameOverMessage(position, humanColor, drawReason)
         AlertDialog(

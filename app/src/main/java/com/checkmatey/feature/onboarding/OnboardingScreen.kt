@@ -36,6 +36,7 @@ private data class OnboardPage(val emoji: String, val title: String, val body: S
 
 private val PAGES = listOf(
     OnboardPage("♟️", "체스, 제대로 배우기", "Checkmatey는 오프라인·무료로 코치와 함께 실력을 키우는 학습 앱입니다. 계정도 필요 없어요."),
+    OnboardPage("🔤", "칸 이름부터 쉽게", "보드 가장자리의 a~h(가로)와 1~8(세로)이 칸 이름이에요. 'e4'는 e줄 4번째 칸!\n처음이라면 [레슨] 탭의 '칸 이름 읽기'부터 시작하세요."),
     OnboardPage("🤖", "코치와 함께 두기", "컴퓨터와 두면서 힌트와 실시간 채점으로 '왜'를 배웁니다. 난이도는 내 실력에 맞춰 적응해요."),
     OnboardPage("🧩", "레이팅으로 성장", "전술 퍼즐을 풀면 내 레이팅이 오르고, 약한 부분을 집중 훈련합니다."),
     OnboardPage("📊", "명국 공부 & 복기", "유명 명국을 따라 두고, 내 게임을 분석해 실수를 짚어 실력을 끌어올립니다."),
