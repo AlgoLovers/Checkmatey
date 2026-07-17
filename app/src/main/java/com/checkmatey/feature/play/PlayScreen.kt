@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -24,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -40,29 +42,31 @@ import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.PieceType
 import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
+import com.checkmatey.core.engine.Annotator
 import com.checkmatey.core.engine.BotLevel
 import com.checkmatey.core.engine.KotlinMinimaxEngine
+import com.checkmatey.core.engine.MoveAnnotation
+import com.checkmatey.core.engine.MoveQuality
 import com.checkmatey.ui.board.ChessBoard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
-// Survive rotation by saving the game as a FEN string.
-private val PositionSaver = Saver<Position, String>(
-    save = { it.toFen() },
-    restore = { Position.fromFen(it) },
-)
+private val PositionSaver = Saver<Position, String>(save = { it.toFen() }, restore = { Position.fromFen(it) })
 
 /**
- * Play tab: the human (White) vs the on-device engine (Black). Everything is framed by
- * rating — the opponent is chosen by target Elo, and the status makes it clear whose turn
- * it is, whether the game just started, and when (and how) it ends.
+ * Play tab: the human (White) vs the on-device engine (Black), with a coach. Tap a piece to move;
+ * the "힌트" button shows the best move and why, and (when the coach is on) each of your moves is
+ * graded — turning a game into a lesson.
  */
 @Composable
 fun PlayScreen(modifier: Modifier = Modifier) {
     val engine = remember { KotlinMinimaxEngine() }
+    val annotator = remember { Annotator(engine) }
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
     val humanColor = PieceColor.WHITE
 
     var level by rememberSaveable { mutableStateOf(BotLevel.BEGINNER) }
@@ -71,16 +75,21 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     var lastMove by remember { mutableStateOf<Move?>(null) }
     var thinking by remember { mutableStateOf(false) }
     var gameOverSeen by remember { mutableStateOf(false) }
+    var coachOn by rememberSaveable { mutableStateOf(true) }
+    var hint by remember { mutableStateOf<MoveAnnotation?>(null) }
+    var feedback by remember { mutableStateOf<MoveAnnotation?>(null) }
 
     val isHumanTurn = position.sideToMove == humanColor && !position.isGameOver()
     val isStart = position.toFen() == Position.STARTING_FEN
     val targets: Set<Square> = selected?.let { from ->
         position.legalMoves().filter { it.from == from }.map { it.to }.toSet()
     } ?: emptySet()
+    val hintSquares: Set<Square> = hint?.bestMove?.let { setOf(it.from, it.to) } ?: emptySet()
 
     fun applyMove(move: Move) {
         position = position.applyMove(move)
         lastMove = move
+        hint = null
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
     }
 
@@ -88,16 +97,15 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         position = Position.startingPosition()
         selected = null
         lastMove = null
+        hint = null
+        feedback = null
         gameOverSeen = false
     }
 
-    // The bot moves whenever it is its turn.
     LaunchedEffect(position) {
         if (position.sideToMove != humanColor && !position.isGameOver()) {
             thinking = true
-            val move = withContext(Dispatchers.Default) {
-                engine.chooseMove(position, level, Random.Default)
-            }
+            val move = withContext(Dispatchers.Default) { engine.chooseMove(position, level, Random.Default) }
             delay(200)
             if (move != null) applyMove(move)
             thinking = false
@@ -116,57 +124,59 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             return
         }
         val candidates = position.legalMoves().filter { it.from == current && it.to == square }
-        val move = candidates.firstOrNull { it.promotion == null }
-            ?: candidates.firstOrNull { it.promotion == PieceType.QUEEN }
+        val move = candidates.firstOrNull { it.promotion == null } ?: candidates.firstOrNull { it.promotion == PieceType.QUEEN }
         if (move != null) {
+            val before = position
             applyMove(move)
             selected = null
+            feedback = null
+            if (coachOn) scope.launch { feedback = withContext(Dispatchers.Default) { annotator.annotate(before, move) } }
         } else {
             selected = if (position.pieceAt(square)?.color == humanColor) square else null
         }
     }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = "상대: 컴퓨터 (흑)  ·  나: 백",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
         RatingSelector(selected = level, onSelect = { level = it })
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         StatusCard(position = position, humanColor = humanColor, thinking = thinking, isStart = isStart)
-        Spacer(Modifier.height(12.dp))
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center,
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            FilledTonalButton(
+                onClick = { if (isHumanTurn) scope.launch { hint = withContext(Dispatchers.Default) { annotator.hint(position) }; feedback = null } },
+                enabled = isHumanTurn,
+            ) { Text("💡 힌트") }
+            Toggle(label = "코치", on = coachOn, onChange = { coachOn = it; if (!it) feedback = null })
+        }
+        Spacer(Modifier.height(8.dp))
+
+        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(560.dp)
+                val side = minOf(maxWidth, maxHeight).coerceAtMost(520.dp)
                 ChessBoard(
                     position = position,
                     modifier = Modifier.size(side),
                     selected = selected,
                     targets = targets,
                     lastMove = lastMove,
+                    hintSquares = hintSquares,
                     onSquareClick = ::onSquareClick,
                 )
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        CoachCard(hint = hint, feedback = feedback.takeIf { coachOn })
+        Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = ::newGame) { Text("새 게임") }
     }
 
-    // Unmissable game-over dialog.
     if (position.isGameOver() && !gameOverSeen) {
         val (title, detail) = gameOverMessage(position, humanColor)
         AlertDialog(
@@ -179,7 +189,62 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     }
 }
 
-/** Level buttons that show both the tier name and its target rating. */
+/** Shows the active hint, else the coach's grade of your last move. */
+@Composable
+private fun CoachCard(hint: MoveAnnotation?, feedback: MoveAnnotation?) {
+    val scheme = MaterialTheme.colorScheme
+    val text: String
+    val container: Color
+    val onContainer: Color
+    when {
+        hint != null -> {
+            text = "💡 추천: ${hint.bestSan}  —  ${hint.reason}"
+            container = scheme.secondaryContainer
+            onContainer = scheme.onSecondaryContainer
+        }
+        feedback != null -> {
+            val f = feedback
+            val head = "직전 수 ${f.san}: ${f.quality.label} ${f.quality.symbol}"
+            text = if (f.quality.ordinal >= MoveQuality.INACCURACY.ordinal) "$head\n${f.reason}" else head
+            val bad = f.quality == MoveQuality.MISTAKE || f.quality == MoveQuality.BLUNDER
+            container = if (bad) scheme.errorContainer else scheme.tertiaryContainer
+            onContainer = if (bad) scheme.onErrorContainer else scheme.onTertiaryContainer
+        }
+        else -> return
+    }
+    Spacer(Modifier.height(8.dp))
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = container,
+        contentColor = onContainer,
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun Toggle(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
+    Surface(
+        onClick = { onChange(!on) },
+        shape = RoundedCornerShape(8.dp),
+        color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+        contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        border = if (on) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Text(
+            "$label ${if (on) "✓" else ""}".trim(),
+            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+}
+
 @Composable
 private fun RatingSelector(selected: BotLevel, onSelect: (BotLevel) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -193,10 +258,7 @@ private fun RatingSelector(selected: BotLevel, onSelect: (BotLevel) -> Unit) {
                 contentColor = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                 border = if (isSel) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
-                Column(
-                    modifier = Modifier.padding(vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
+                Column(Modifier.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(level.displayName, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                     Text("~${level.approxElo}", style = MaterialTheme.typography.labelSmall)
                 }
@@ -205,7 +267,6 @@ private fun RatingSelector(selected: BotLevel, onSelect: (BotLevel) -> Unit) {
     }
 }
 
-/** Prominent, color-coded status: whose turn, check, start hint, or the game result. */
 @Composable
 private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boolean, isStart: Boolean) {
     val scheme = MaterialTheme.colorScheme
@@ -213,19 +274,18 @@ private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boo
     val win = position.isCheckmate() && position.sideToMove != humanColor
     val draw = position.isStalemate()
 
-    val container: Color = when {
+    val container = when {
         loss -> scheme.errorContainer
         win -> scheme.tertiaryContainer
         draw || thinking -> scheme.surfaceVariant
         else -> scheme.primaryContainer
     }
-    val onContainer: Color = when {
+    val onContainer = when {
         loss -> scheme.onErrorContainer
         win -> scheme.onTertiaryContainer
         draw || thinking -> scheme.onSurfaceVariant
         else -> scheme.onPrimaryContainer
     }
-
     val headline = when {
         loss -> "체크메이트 — 패배"
         win -> "체크메이트 — 승리 🎉"
@@ -240,17 +300,9 @@ private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boo
         isStart -> "새 게임 · 흰 기물을 탭해 첫 수를 두세요"
         else -> "${position.fullmoveNumber}수째"
     }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = container,
-        contentColor = onContainer,
-    ) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = container, contentColor = onContainer) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(headline, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -260,10 +312,7 @@ private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boo
 }
 
 private fun gameOverMessage(position: Position, humanColor: PieceColor): Pair<String, String> = when {
-    position.isCheckmate() && position.sideToMove == humanColor ->
-        "패배" to "체크메이트. 컴퓨터가 이겼습니다. 다시 도전해 보세요."
-    position.isCheckmate() ->
-        "승리 🎉" to "체크메이트! 당신이 이겼습니다."
-    else ->
-        "무승부" to "스테일메이트 — 둘 수 있는 합법수가 없습니다."
+    position.isCheckmate() && position.sideToMove == humanColor -> "패배" to "체크메이트. 컴퓨터가 이겼습니다. 다시 도전해 보세요."
+    position.isCheckmate() -> "승리 🎉" to "체크메이트! 당신이 이겼습니다."
+    else -> "무승부" to "스테일메이트 — 둘 수 있는 합법수가 없습니다."
 }

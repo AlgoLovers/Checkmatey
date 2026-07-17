@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
@@ -56,6 +57,7 @@ fun ChessBoard(
     selected: Square? = null,
     targets: Set<Square> = emptySet(),
     lastMove: Move? = null,
+    hintSquares: Set<Square> = emptySet(),
     onSquareClick: ((Square) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier.aspectRatio(1f)) {
@@ -100,6 +102,9 @@ fun ChessBoard(
                             if (piece != null && !(animating && square == lastMove?.to)) {
                                 PieceGlyph(piece, glyphSize)
                             }
+                            if (square in hintSquares) {
+                                Box(Modifier.matchParentSize().border(3.dp, HintColor, RectangleShape))
+                            }
                             if (square in targets) {
                                 if (piece != null) {
                                     Box(Modifier.fillMaxSize(0.92f).border(3.dp, Color.Black.copy(alpha = 0.30f), CircleShape))
@@ -128,6 +133,9 @@ fun ChessBoard(
         }
     }
 }
+
+// Border color marking the hint (best-move) squares.
+private val HintColor = Color(0xFF1E88E5)
 
 @Composable
 private fun PieceGlyph(piece: Piece, size: TextUnit) {

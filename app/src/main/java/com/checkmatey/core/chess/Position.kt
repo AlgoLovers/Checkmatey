@@ -1,6 +1,7 @@
 package com.checkmatey.core.chess
 
 import kotlin.math.abs
+import kotlin.math.sign
 
 /** Castling availability for both sides. */
 data class CastlingRights(
@@ -258,6 +259,38 @@ class Position(
             }
         }
         return false
+    }
+
+    /** True if the piece on [from] attacks [to] (pseudo — ignores pins and whose turn it is). */
+    fun attacksFrom(from: Square, to: Square): Boolean {
+        val piece = pieceAt(from) ?: return false
+        val df = to.file - from.file
+        val dr = to.rank - from.rank
+        if (df == 0 && dr == 0) return false
+        return when (piece.type) {
+            PieceType.PAWN -> {
+                val dir = if (piece.color == PieceColor.WHITE) 1 else -1
+                dr == dir && abs(df) == 1
+            }
+            PieceType.KNIGHT -> (abs(df) == 1 && abs(dr) == 2) || (abs(df) == 2 && abs(dr) == 1)
+            PieceType.KING -> abs(df) <= 1 && abs(dr) <= 1
+            PieceType.BISHOP -> abs(df) == abs(dr) && clearPath(from, to)
+            PieceType.ROOK -> (df == 0 || dr == 0) && clearPath(from, to)
+            PieceType.QUEEN -> (abs(df) == abs(dr) || df == 0 || dr == 0) && clearPath(from, to)
+        }
+    }
+
+    private fun clearPath(from: Square, to: Square): Boolean {
+        val stepF = (to.file - from.file).sign
+        val stepR = (to.rank - from.rank).sign
+        var f = from.file + stepF
+        var r = from.rank + stepR
+        while (f != to.file || r != to.rank) {
+            if (pieceAt(f, r) != null) return false
+            f += stepF
+            r += stepR
+        }
+        return true
     }
 
     private fun kingSquare(color: PieceColor): Square? {

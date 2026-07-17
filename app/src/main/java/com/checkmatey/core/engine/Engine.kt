@@ -13,6 +13,12 @@ interface Engine {
     fun bestMove(position: Position, depth: Int): Move?
 
     /**
+     * Search value of playing [move] from [before], in centipawns from the moving side's
+     * perspective (higher = better). Used to score/compare moves for coaching feedback.
+     */
+    fun evaluateMove(before: Position, move: Move, depth: Int): Int
+
+    /**
      * A move for the given [level]. May deliberately play a weaker move (see
      * [BotLevel.blunderChance]); [random] is injectable so games can be reproduced/tested.
      */

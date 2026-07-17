@@ -27,6 +27,9 @@ class KotlinMinimaxEngine : Engine {
         return bestMove(position, level.searchDepth)
     }
 
+    override fun evaluateMove(before: Position, move: Move, depth: Int): Int =
+        -negamax(before.applyMove(move), depth - 1, NEG_INF, -NEG_INF, ply = 1)
+
     override fun bestMove(position: Position, depth: Int): Move? {
         val moves = order(position, position.legalMoves())
         if (moves.isEmpty()) return null
