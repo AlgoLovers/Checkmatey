@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import com.checkmatey.data.UserStore
+import com.checkmatey.feature.lesson.LessonScreen
 import com.checkmatey.feature.onboarding.OnboardingScreen
 import com.checkmatey.feature.play.PlayScreen
 import com.checkmatey.feature.profile.ProfileScreen
@@ -34,8 +36,9 @@ import com.checkmatey.feature.study.StudyScreen
 
 /** Top-level tabs. */
 private enum class TopDestination(val label: String, val icon: ImageVector) {
+    LESSONS("레슨", Icons.Filled.Edit),
     LEARN("명국", Icons.Filled.Star),
-    PLAY("Play", Icons.Filled.PlayArrow),
+    PLAY("대국", Icons.Filled.PlayArrow),
     PUZZLES("퍼즐", Icons.Filled.Search),
     PROFILE("분석", Icons.Filled.Person),
 }
@@ -79,6 +82,7 @@ fun CheckmateyApp() {
             },
         ) {
             when (current) {
+                TopDestination.LESSONS -> LessonScreen()
                 TopDestination.LEARN -> StudyScreen()
                 TopDestination.PLAY -> PlayScreen()
                 TopDestination.PUZZLES -> PuzzlesScreen()

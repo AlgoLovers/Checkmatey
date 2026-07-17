@@ -35,6 +35,11 @@ class UserStore(context: Context) {
         get() = prefs.getBoolean(KEY_ONBOARDED, false)
         set(value) = prefs.edit().putBoolean(KEY_ONBOARDED, value).apply()
 
+    /** Ids of lessons the user has finished. */
+    var completedLessons: Set<String>
+        get() = prefs.getString(KEY_LESSONS, "").orEmpty().split(",").filter { it.isNotBlank() }.toSet()
+        set(value) = prefs.edit().putString(KEY_LESSONS, value.joinToString(",")).apply()
+
     /** Ids of previously-missed puzzles, queued for spaced-repetition review. */
     var reviewIds: List<String>
         get() = prefs.getString(KEY_REVIEW, "").orEmpty().split(",").filter { it.isNotBlank() }
@@ -80,5 +85,6 @@ class UserStore(context: Context) {
         const val KEY_THEMES = "themeStats"
         const val KEY_SOUND = "soundOn"
         const val KEY_ONBOARDED = "onboardingSeen"
+        const val KEY_LESSONS = "completedLessons"
     }
 }
