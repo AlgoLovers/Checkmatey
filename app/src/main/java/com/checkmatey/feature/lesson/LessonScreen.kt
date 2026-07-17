@@ -42,14 +42,28 @@ import com.checkmatey.core.lesson.Lessons
 import com.checkmatey.data.UserStore
 import com.checkmatey.ui.board.ChessBoard
 
-/** Lessons tab: a beginner curriculum of guided, hands-on lessons. */
+/** Endgame drills played against the engine (it defends for real). */
+private data class PracticeDrill(val title: String, val subtitle: String, val fen: String)
+
+private val PRACTICE_DRILLS = listOf(
+    PracticeDrill("킹+퀸 메이트 실습", "엔진을 상대로 직접 몰아넣기", "8/8/8/4k3/8/8/8/2QK4 w - - 0 1"),
+    PracticeDrill("킹+룩 메이트 실습", "상자 기술을 실전으로", "8/8/8/4k3/8/8/8/2RK4 w - - 0 1"),
+)
+
+/** Lessons tab: a beginner curriculum of guided, hands-on lessons plus engine practice. */
 @Composable
 fun LessonScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val store = remember { UserStore(context) }
     var completed by remember { mutableStateOf(store.completedLessons) }
     var openIndex by rememberSaveable { mutableIntStateOf(-1) }
+    var practiceIndex by rememberSaveable { mutableIntStateOf(-1) }
 
+    if (practiceIndex in PRACTICE_DRILLS.indices) {
+        val drill = PRACTICE_DRILLS[practiceIndex]
+        PracticeScreen(title = drill.title, startFen = drill.fen, onBack = { practiceIndex = -1 }, modifier = modifier)
+        return
+    }
     if (openIndex in Lessons.ALL.indices) {
         LessonDetail(
             lesson = Lessons.ALL[openIndex],
@@ -61,12 +75,22 @@ fun LessonScreen(modifier: Modifier = Modifier) {
             modifier = modifier,
         )
     } else {
-        LessonList(completed = completed, onOpen = { openIndex = it }, modifier = modifier)
+        LessonList(
+            completed = completed,
+            onOpen = { openIndex = it },
+            onOpenPractice = { practiceIndex = it },
+            modifier = modifier,
+        )
     }
 }
 
 @Composable
-private fun LessonList(completed: Set<String>, onOpen: (Int) -> Unit, modifier: Modifier) {
+private fun LessonList(
+    completed: Set<String>,
+    onOpen: (Int) -> Unit,
+    onOpenPractice: (Int) -> Unit,
+    modifier: Modifier,
+) {
     Column(modifier.fillMaxSize().padding(16.dp)) {
         Text("레슨", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(
@@ -98,6 +122,24 @@ private fun LessonList(completed: Set<String>, onOpen: (Int) -> Unit, modifier: 
                             Text(lesson.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Text(if (done) "✓ 완료" else "${lesson.steps.size}단계", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+            item {
+                Spacer(Modifier.height(6.dp))
+                Text("엔드게임 실습 — 엔진 상대", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            }
+            items(PRACTICE_DRILLS.size) { index ->
+                val drill = PRACTICE_DRILLS[index]
+                Surface(
+                    onClick = { onOpenPractice(index) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(drill.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(drill.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
                 }
             }
