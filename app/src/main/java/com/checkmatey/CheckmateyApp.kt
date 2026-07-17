@@ -14,14 +14,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.checkmatey.feature.learn.LearnScreen
 import com.checkmatey.feature.play.PlayScreen
 import com.checkmatey.feature.profile.ProfileScreen
 import com.checkmatey.feature.puzzles.PuzzlesScreen
+import com.checkmatey.feature.study.StudyScreen
 
 /** Top-level tabs. */
 private enum class TopDestination(val label: String, val icon: ImageVector) {
-    LEARN("Learn", Icons.Filled.Star),
+    LEARN("명국", Icons.Filled.Star),
     PLAY("Play", Icons.Filled.PlayArrow),
     PUZZLES("Puzzles", Icons.Filled.Search),
     PROFILE("Profile", Icons.Filled.Person),
@@ -51,7 +51,7 @@ fun CheckmateyApp() {
         },
     ) {
         when (current) {
-            TopDestination.LEARN -> LearnScreen()
+            TopDestination.LEARN -> StudyScreen()
             TopDestination.PLAY -> PlayScreen()
             TopDestination.PUZZLES -> PuzzlesScreen()
             TopDestination.PROFILE -> ProfileScreen()
