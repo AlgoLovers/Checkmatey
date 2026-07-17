@@ -19,5 +19,15 @@ enum class BotLevel(
     SEEDLING("새싹", 400, 1, 0.60),
     BEGINNER("초급", 700, 2, 0.35),
     INTERMEDIATE("중급", 1000, 3, 0.15),
-    CHALLENGER("도전", 1200, 4, 0.05),
+    CHALLENGER("도전", 1200, 4, 0.05);
+
+    companion object {
+        /** The level that best matches a player's rating — used for adaptive difficulty. */
+        fun forRating(rating: Int): BotLevel = when {
+            rating < 550 -> SEEDLING
+            rating < 850 -> BEGINNER
+            rating < 1100 -> INTERMEDIATE
+            else -> CHALLENGER
+        }
+    }
 }

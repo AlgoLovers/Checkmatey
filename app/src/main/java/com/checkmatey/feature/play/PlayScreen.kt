@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +50,7 @@ import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.core.engine.MoveAnnotation
 import com.checkmatey.core.engine.MoveQuality
 import com.checkmatey.core.study.StudyGames
+import com.checkmatey.data.UserStore
 import com.checkmatey.feature.review.ReviewScreen
 import com.checkmatey.ui.board.ChessBoard
 import kotlinx.coroutines.Dispatchers
@@ -70,9 +72,12 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     val annotator = remember { Annotator(engine) }
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val userRating = remember { UserStore(context).puzzleRating }
     val humanColor = PieceColor.WHITE
 
     var level by rememberSaveable { mutableStateOf(BotLevel.BEGINNER) }
+    var adaptive by rememberSaveable { mutableStateOf(false) }
     var position by rememberSaveable(stateSaver = PositionSaver) { mutableStateOf(Position.startingPosition()) }
     var selected by remember { mutableStateOf<Square?>(null) }
     var lastMove by remember { mutableStateOf<Move?>(null) }
@@ -96,6 +101,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         position.legalMoves().filter { it.from == from }.map { it.to }.toSet()
     } ?: emptySet()
     val hintSquares: Set<Square> = hint?.bestMove?.let { setOf(it.from, it.to) } ?: emptySet()
+    val effectiveLevel = if (adaptive) BotLevel.forRating(userRating) else level
 
     fun applyMove(move: Move) {
         position = position.applyMove(move)
@@ -118,7 +124,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(position) {
         if (position.sideToMove != humanColor && !position.isGameOver()) {
             thinking = true
-            val move = withContext(Dispatchers.Default) { engine.chooseMove(position, level, Random.Default) }
+            val move = withContext(Dispatchers.Default) { engine.chooseMove(position, effectiveLevel, Random.Default) }
             delay(200)
             if (move != null) applyMove(move)
             thinking = false
@@ -153,7 +159,15 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        RatingSelector(selected = level, onSelect = { level = it })
+        RatingSelector(selected = if (adaptive) effectiveLevel else level, onSelect = { level = it; adaptive = false })
+        if (adaptive) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "적응 난이도 · 내 레이팅 $userRating → ${effectiveLevel.displayName} ~${effectiveLevel.approxElo}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         Spacer(Modifier.height(10.dp))
         StatusCard(position = position, humanColor = humanColor, thinking = thinking, isStart = isStart)
         Spacer(Modifier.height(8.dp))
@@ -167,6 +181,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
                 enabled = isHumanTurn,
             ) { Text("💡 힌트") }
             Toggle(label = "코치", on = coachOn, onChange = { coachOn = it; if (!it) feedback = null })
+            Toggle(label = "적응", on = adaptive, onChange = { adaptive = it })
         }
         Spacer(Modifier.height(8.dp))
 

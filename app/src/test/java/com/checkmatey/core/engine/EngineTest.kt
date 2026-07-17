@@ -64,6 +64,14 @@ class EngineTest {
     }
 
     @Test
+    fun adaptiveLevelTracksRating() {
+        assertEquals(BotLevel.SEEDLING, BotLevel.forRating(400))
+        assertEquals(BotLevel.BEGINNER, BotLevel.forRating(700))
+        assertEquals(BotLevel.INTERMEDIATE, BotLevel.forRating(1000))
+        assertEquals(BotLevel.CHALLENGER, BotLevel.forRating(1300))
+    }
+
+    @Test
     fun playsAShortGameWithoutError() {
         var pos = Position.startingPosition()
         val random = Random(42)
