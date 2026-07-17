@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +32,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.checkmatey.core.chess.Move
 import com.checkmatey.core.chess.PieceColor
+import com.checkmatey.core.chess.Position
+import com.checkmatey.core.chess.Square
 import com.checkmatey.core.engine.Annotator
 import com.checkmatey.core.engine.GameReviewer
 import com.checkmatey.core.engine.KotlinMinimaxEngine
@@ -41,6 +45,7 @@ import com.checkmatey.core.study.StudyGame
 import com.checkmatey.ui.board.ChessBoard
 import com.checkmatey.ui.board.BoardArrow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -99,6 +104,88 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
         Spacer(Modifier.height(10.dp))
 
         val annotation = if (ply > 0) done.getOrNull(ply - 1) else null
+
+        // ---- Retry mode: replay this moment yourself and get graded instantly. ----
+        var retryMode by remember { mutableStateOf(false) }
+        var retrySelected by remember { mutableStateOf<Square?>(null) }
+        var retryDisplay by remember { mutableStateOf<Position?>(null) }
+        var retryLast by remember { mutableStateOf<Move?>(null) }
+        var retryFeedback by remember { mutableStateOf<MoveAnnotation?>(null) }
+        val scope = rememberCoroutineScope()
+
+        fun exitRetry() {
+            retryMode = false
+            retrySelected = null
+            retryDisplay = null
+            retryLast = null
+            retryFeedback = null
+        }
+
+        if (retryMode && ply > 0) {
+            val basePos = game.positionAt(ply - 1)
+            val fb = retryFeedback
+            val scheme = MaterialTheme.colorScheme
+            val (cardText, container, onContainer) = when {
+                fb == null -> Triple("🔁 이 국면에서 직접 두어 보세요 — 코치가 바로 채점합니다", scheme.primaryContainer, scheme.onPrimaryContainer)
+                fb.quality.ordinal <= MoveQuality.GOOD.ordinal ->
+                    Triple("${fb.san}  ${fb.quality.label} ${fb.quality.symbol} — ${fb.reason}", scheme.tertiaryContainer, scheme.onTertiaryContainer)
+                else ->
+                    Triple("${fb.san}  ${fb.quality.label} ${fb.quality.symbol}\n${fb.reason}", scheme.errorContainer, scheme.onErrorContainer)
+            }
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = container, contentColor = onContainer) {
+                Text(cardText, Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+            }
+            Spacer(Modifier.height(10.dp))
+
+            val shown = retryDisplay ?: basePos
+            val targets: Set<Square> = if (retryDisplay == null) {
+                retrySelected?.let { from -> basePos.legalMoves().filter { it.from == from }.map { it.to }.toSet() } ?: emptySet()
+            } else emptySet()
+
+            fun onRetryClick(square: Square) {
+                if (retryDisplay != null) return
+                val current = retrySelected
+                if (current == null) {
+                    if (basePos.pieceAt(square)?.color == basePos.sideToMove) retrySelected = square
+                    return
+                }
+                if (square == current) { retrySelected = null; return }
+                val candidates = basePos.legalMoves().filter { it.from == current && it.to == square }
+                val move = candidates.firstOrNull { it.promotion == null } ?: candidates.firstOrNull()
+                if (move == null) {
+                    retrySelected = if (basePos.pieceAt(square)?.color == basePos.sideToMove) square else null
+                    return
+                }
+                retrySelected = null
+                retryDisplay = basePos.applyMove(move)
+                retryLast = move
+                scope.launch { retryFeedback = withContext(Dispatchers.Default) { annotator.annotate(basePos, move) } }
+            }
+
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                BoxWithConstraints {
+                    val side = minOf(maxWidth, maxHeight).coerceAtMost(480.dp)
+                    ChessBoard(
+                        position = shown,
+                        modifier = Modifier.size(side),
+                        selected = retrySelected,
+                        targets = targets,
+                        lastMove = retryLast,
+                        onSquareClick = if (retryDisplay == null) ::onRetryClick else null,
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { retrySelected = null; retryDisplay = null; retryLast = null; retryFeedback = null },
+                    enabled = retryDisplay != null,
+                ) { Text("다른 수 시도") }
+                OutlinedButton(onClick = ::exitRetry) { Text("복기로 돌아가기") }
+            }
+            return@Column
+        }
+
         MoveCard(game = game, ply = ply, annotation = annotation)
         Spacer(Modifier.height(10.dp))
 
@@ -166,6 +253,10 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
                 onClick = { ply = nextMistake(game, done, mySide, ply); autoplay = false },
                 enabled = hasNextMistake(game, done, mySide, ply),
             ) { Text("다음 실수") }
+        }
+        if (ply > 0) {
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(onClick = { autoplay = false; retryMode = true }) { Text("🔁 이 수 다시 둬보기") }
         }
     }
 }
