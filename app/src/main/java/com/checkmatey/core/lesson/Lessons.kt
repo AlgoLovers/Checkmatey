@@ -72,6 +72,56 @@ object Lessons {
             ),
         ),
         Lesson(
+            id = "brq",
+            title = "비숍·룩·퀸",
+            subtitle = "직선 기물 삼총사",
+            steps = listOf(
+                LessonStep(
+                    fen = "4k3/8/8/8/8/2r5/8/B3K3 w - - 0 1",
+                    instruction = "비숍은 대각선으로 끝까지 달립니다.\na1 비숍으로 c3의 룩을 잡아보세요.",
+                    acceptUci = setOf("a1c3"),
+                    explain = "정확! 비숍은 자기 색 칸의 대각선을 지배합니다.",
+                ),
+                LessonStep(
+                    fen = "4k3/8/8/n7/8/8/8/R3K3 w - - 0 1",
+                    instruction = "룩은 가로·세로로 끝까지 달립니다.\na1 룩으로 a5의 나이트를 잡아보세요.",
+                    acceptUci = setOf("a1a5"),
+                    explain = "좋아요! 룩은 열린 줄(파일)에서 가장 강합니다.",
+                ),
+                LessonStep(
+                    fen = "4k3/8/8/8/3n4/8/8/Q3K3 w - - 0 1",
+                    instruction = "퀸은 비숍+룩 — 최강의 기물입니다.\na1 퀸으로 d4의 나이트를 잡아보세요.",
+                    acceptUci = setOf("a1d4"),
+                    explain = "퀸은 모든 방향으로 움직입니다. 그래서 잃으면 가장 아픕니다!",
+                ),
+            ),
+        ),
+        Lesson(
+            id = "check_escape",
+            title = "체크에서 벗어나기",
+            subtitle = "피하기 · 막기 · 잡기",
+            steps = listOf(
+                LessonStep(
+                    fen = "4r1k1/8/8/8/8/8/8/4K3 w - - 0 1",
+                    instruction = "체크! 벗어나는 법 ① 킹이 피하기.\n킹을 안전한 칸으로 옮기세요.",
+                    acceptUci = setOf("e1d1", "e1f1", "e1d2", "e1f2"),
+                    explain = "좋아요! 체크에서 가장 흔한 해법은 킹이 피하는 것입니다.",
+                ),
+                LessonStep(
+                    fen = "4r1k1/8/8/8/R7/8/8/4K3 w - - 0 1",
+                    instruction = "벗어나는 법 ② 사이를 막기.\n룩을 e4로 옮겨 체크를 막아보세요.",
+                    acceptUci = setOf("a4e4"),
+                    explain = "블록! 기물이 방패가 되어 킹을 지켰습니다.",
+                ),
+                LessonStep(
+                    fen = "4k3/8/8/8/8/8/3q4/4K1R1 w - - 0 1",
+                    instruction = "벗어나는 법 ③ 공격자를 잡기.\n체크를 건 퀸을 킹으로 잡아보세요.",
+                    acceptUci = setOf("e1d2"),
+                    explain = "제거! 보호받지 않는 공격자는 잡는 게 최고의 해법입니다.",
+                ),
+            ),
+        ),
+        Lesson(
             id = "castle",
             title = "캐슬링",
             subtitle = "킹을 안전하게",
@@ -81,6 +131,19 @@ object Lessons {
                     instruction = "캐슬링은 킹을 안전하게 하고 룩을 전개하는 특별한 수입니다.\n킹을 g1으로 두 칸 옮겨 킹사이드 캐슬링(O-O)을 해보세요.",
                     acceptUci = setOf("e1g1"),
                     explain = "캐슬링 성공! 킹과 룩이 한 수에 함께 움직였습니다.",
+                ),
+            ),
+        ),
+        Lesson(
+            id = "enpassant",
+            title = "앙파상",
+            subtitle = "폰의 특별 규칙",
+            steps = listOf(
+                LessonStep(
+                    fen = "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
+                    instruction = "상대 폰이 방금 두 칸 전진해 내 폰 옆에 섰다면, 지나간 것처럼 잡을 수 있습니다(앙파상).\ne5 폰으로 d6을 눌러 d5 폰을 잡아보세요.",
+                    acceptUci = setOf("e5d6"),
+                    explain = "앙파상 성공! 단, 바로 다음 수에만 가능합니다 — 기회는 한 번뿐.",
                 ),
             ),
         ),

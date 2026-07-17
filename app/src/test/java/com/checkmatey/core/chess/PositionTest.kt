@@ -120,6 +120,25 @@ class PositionTest {
     }
 
     @Test
+    fun detectsInsufficientMaterialDraws() {
+        assertTrue(Position.fromFen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").hasInsufficientMaterial()) // K vs K
+        assertTrue(Position.fromFen("4k3/8/8/8/8/8/8/2N1K3 w - - 0 1").hasInsufficientMaterial()) // KN vs K
+        assertTrue(Position.fromFen("2b1k3/8/8/8/8/8/8/4K3 w - - 0 1").hasInsufficientMaterial()) // K vs KB
+        assertFalse(Position.fromFen("4k3/8/8/8/8/8/8/3QK3 w - - 0 1").hasInsufficientMaterial()) // KQ vs K
+        assertFalse(Position.fromFen("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1").hasInsufficientMaterial()) // KP vs K
+        assertTrue(Position.fromFen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").isGameOver())
+    }
+
+    @Test
+    fun detectsFiftyMoveDraw() {
+        val pos = Position.fromFen("4k3/8/8/8/8/8/8/R3K3 w - - 100 80")
+        assertTrue(pos.isFiftyMoveDraw())
+        assertTrue(pos.isGameOver())
+        assertFalse(pos.isCheckmate())
+        assertFalse(Position.fromFen("4k3/8/8/8/8/8/8/R3K3 w - - 99 80").isFiftyMoveDraw())
+    }
+
+    @Test
     fun detectsStalemate() {
         // Black to move, not in check, but has no legal move.
         val pos = Position.fromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")

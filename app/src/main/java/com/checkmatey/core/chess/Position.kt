@@ -314,7 +314,24 @@ class Position(
 
     fun isStalemate(): Boolean = !isInCheck() && legalMoves().isEmpty()
 
-    fun isGameOver(): Boolean = legalMoves().isEmpty()
+    /** Fifty-move rule: 100 halfmoves without a pawn move or capture. */
+    fun isFiftyMoveDraw(): Boolean = halfmoveClock >= 100
+
+    /** Neither side can possibly mate: K vs K, or K+minor vs K. */
+    fun hasInsufficientMaterial(): Boolean {
+        var nonKings = 0
+        var allMinor = true
+        for (p in squares) {
+            if (p == null || p.type == PieceType.KING) continue
+            nonKings++
+            if (p.type != PieceType.BISHOP && p.type != PieceType.KNIGHT) allMinor = false
+        }
+        return nonKings == 0 || (nonKings == 1 && allMinor)
+    }
+
+    /** No legal moves (mate/stalemate), or a rule-based draw. Threefold repetition is
+     *  judged by the caller, since it needs game history a single position doesn't have. */
+    fun isGameOver(): Boolean = legalMoves().isEmpty() || isFiftyMoveDraw() || hasInsufficientMaterial()
 
     // ---- Apply a move ---------------------------------------------------------------
 

@@ -123,10 +123,10 @@ fun PracticeScreen(title: String, startFen: String, onBack: () -> Unit, modifier
 
         val scheme = MaterialTheme.colorScheme
         val won = position.isCheckmate() && position.sideToMove != humanColor
-        val stale = position.isStalemate()
+        val drawn = !won && position.isGameOver() // stalemate, insufficient material, fifty-move
         val (text, container, onContainer) = when {
             won -> Triple("성공! 체크메이트 ✓  ($plies 수)", scheme.tertiaryContainer, scheme.onTertiaryContainer)
-            stale -> Triple("스테일메이트 — 무승부는 실패! 상대 킹이 둘 수 없게 몰아넣지 마세요. 다시!", scheme.errorContainer, scheme.onErrorContainer)
+            drawn -> Triple("무승부 — 실패! 스테일메이트/기물 상실을 조심하고 다시 시도하세요.", scheme.errorContainer, scheme.onErrorContainer)
             thinking -> Triple("상대가 최선의 수비 중…", scheme.surfaceVariant, scheme.onSurfaceVariant)
             else -> Triple("체크메이트를 완성하세요 — 상대는 최선을 다해 도망칩니다", scheme.primaryContainer, scheme.onPrimaryContainer)
         }

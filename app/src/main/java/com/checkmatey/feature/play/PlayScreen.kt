@@ -95,6 +95,9 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     var hint by remember { mutableStateOf<MoveAnnotation?>(null) }
     var feedback by remember { mutableStateOf<MoveAnnotation?>(null) }
     val moves = remember { mutableStateListOf<Move>() }
+    // Position after every ply (starts with the current position) — powers undo and
+    // threefold-repetition detection.
+    val history = remember { mutableStateListOf(position) }
     var reviewing by remember { mutableStateOf(false) }
 
     if (reviewing) {
@@ -103,7 +106,19 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         return
     }
 
-    val isHumanTurn = position.sideToMove == humanColor && !position.isGameOver()
+    // Threefold repetition needs game history, so the screen judges it (core handles the rest).
+    fun repetitionKey(p: Position): String = p.toFen().split(" ").take(4).joinToString(" ")
+    val repetitionDraw = history.count { repetitionKey(it) == repetitionKey(position) } >= 3
+    val gameEnded = position.isGameOver() || repetitionDraw
+    val drawReason: String? = when {
+        position.isCheckmate() -> null
+        repetitionDraw -> "3회 반복"
+        position.isFiftyMoveDraw() -> "50수 규칙"
+        position.hasInsufficientMaterial() -> "기물 부족"
+        position.isStalemate() -> "스테일메이트"
+        else -> null
+    }
+    val isHumanTurn = position.sideToMove == humanColor && !gameEnded
     val isStart = position.toFen() == Position.STARTING_FEN
     val targets: Set<Square> = selected?.let { from ->
         position.legalMoves().filter { it.from == from }.map { it.to }.toSet()
@@ -115,6 +130,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         val capture = position.pieceAt(move.to) != null || move.isEnPassant
         position = position.applyMove(move)
         moves.add(move)
+        history.add(position)
         lastMove = move
         hint = null
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -133,6 +149,8 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     fun newGame() {
         position = Position.startingPosition()
         moves.clear()
+        history.clear()
+        history.add(position)
         selected = null
         lastMove = null
         hint = null
@@ -140,8 +158,26 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         gameOverSeen = false
     }
 
+    /** Take back your last move (and the bot's reply if it already came). */
+    fun undo() {
+        if (moves.isEmpty()) return
+        val plies = if (position.sideToMove == humanColor && moves.size >= 2) 2 else 1
+        repeat(plies) {
+            if (moves.isNotEmpty()) {
+                moves.removeAt(moves.lastIndex)
+                history.removeAt(history.lastIndex)
+            }
+        }
+        position = history.last()
+        lastMove = moves.lastOrNull()
+        selected = null
+        hint = null
+        feedback = null
+        gameOverSeen = false
+    }
+
     LaunchedEffect(position) {
-        if (position.sideToMove != humanColor && !position.isGameOver()) {
+        if (position.sideToMove != humanColor && !gameEnded) {
             thinking = true
             val move = withContext(Dispatchers.Default) { engine.chooseMove(position, effectiveLevel, Random.Default) }
             delay(200)
@@ -188,7 +224,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             )
         }
         Spacer(Modifier.height(10.dp))
-        StatusCard(position = position, humanColor = humanColor, thinking = thinking, isStart = isStart)
+        StatusCard(position = position, humanColor = humanColor, thinking = thinking, isStart = isStart, drawReason = drawReason)
         Spacer(Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -223,13 +259,14 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         CoachCard(hint = hint, feedback = feedback.takeIf { coachOn })
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = ::undo, enabled = moves.isNotEmpty() && !thinking) { Text("↩ 무르기") }
             OutlinedButton(onClick = { reviewing = true }, enabled = moves.isNotEmpty()) { Text("📊 분석") }
             OutlinedButton(onClick = ::newGame) { Text("새 게임") }
         }
     }
 
-    if (position.isGameOver() && !gameOverSeen) {
-        val (title, detail) = gameOverMessage(position, humanColor)
+    if (gameEnded && !gameOverSeen) {
+        val (title, detail) = gameOverMessage(position, humanColor, drawReason)
         AlertDialog(
             onDismissRequest = { gameOverSeen = true },
             title = { Text(title) },
@@ -326,11 +363,11 @@ private fun RatingSelector(selected: BotLevel, onSelect: (BotLevel) -> Unit) {
 }
 
 @Composable
-private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boolean, isStart: Boolean) {
+private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boolean, isStart: Boolean, drawReason: String?) {
     val scheme = MaterialTheme.colorScheme
     val loss = position.isCheckmate() && position.sideToMove == humanColor
     val win = position.isCheckmate() && position.sideToMove != humanColor
-    val draw = position.isStalemate()
+    val draw = drawReason != null
 
     val container = when {
         loss -> scheme.errorContainer
@@ -347,14 +384,14 @@ private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boo
     val headline = when {
         loss -> "체크메이트 — 패배"
         win -> "체크메이트 — 승리 🎉"
-        draw -> "스테일메이트 — 무승부"
+        draw -> "무승부 — $drawReason"
         thinking -> "컴퓨터가 생각 중…"
         position.isInCheck() -> "체크! — 당신(백) 차례"
         position.sideToMove == humanColor -> "당신(백) 차례"
         else -> "컴퓨터(흑) 차례"
     }
     val sub = when {
-        position.isGameOver() -> "'새 게임'으로 다시 시작하세요"
+        loss || win || draw -> "'새 게임'으로 다시 시작하세요"
         isStart -> "새 게임 · 흰 기물을 탭해 첫 수를 두세요"
         else -> "${position.fullmoveNumber}수째"
     }
@@ -369,8 +406,8 @@ private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boo
     }
 }
 
-private fun gameOverMessage(position: Position, humanColor: PieceColor): Pair<String, String> = when {
+private fun gameOverMessage(position: Position, humanColor: PieceColor, drawReason: String?): Pair<String, String> = when {
     position.isCheckmate() && position.sideToMove == humanColor -> "패배" to "체크메이트. 컴퓨터가 이겼습니다. 다시 도전해 보세요."
     position.isCheckmate() -> "승리 🎉" to "체크메이트! 당신이 이겼습니다."
-    else -> "무승부" to "스테일메이트 — 둘 수 있는 합법수가 없습니다."
+    else -> "무승부" to "무승부 — ${drawReason ?: "스테일메이트"}."
 }
