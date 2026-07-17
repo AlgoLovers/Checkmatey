@@ -39,6 +39,7 @@ import com.checkmatey.core.engine.MoveAnnotation
 import com.checkmatey.core.engine.MoveQuality
 import com.checkmatey.core.study.StudyGame
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.board.BoardArrow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -101,6 +102,28 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
         MoveCard(game = game, ply = ply, annotation = annotation)
         Spacer(Modifier.height(10.dp))
 
+        // Board arrows: your move (colour by quality) + the better move in green when they differ.
+        val arrows = remember(ply) {
+            val list = ArrayList<BoardArrow>(2)
+            if (annotation != null && ply > 0) {
+                val played = game.moveAt(ply - 1)
+                val best = annotation.bestMove
+                val playedColor = when {
+                    annotation.quality == MoveQuality.BLUNDER || annotation.quality == MoveQuality.MISTAKE -> Color(0xE0E53935)
+                    annotation.quality == MoveQuality.INACCURACY -> Color(0xE0FB8C00)
+                    else -> Color(0xE043A047)
+                }
+                if (played != null) list.add(BoardArrow(played.from, played.to, playedColor))
+                // Only show the "better move" arrow when it actually differs and the move wasn't best.
+                if (best != null && annotation.quality.ordinal >= MoveQuality.INACCURACY.ordinal &&
+                    (best.from != played?.from || best.to != played.to)
+                ) {
+                    list.add(BoardArrow(best.from, best.to, Color(0xF01E88E5))) // blue = recommended
+                }
+            }
+            list
+        }
+
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             BoxWithConstraints {
                 val side = minOf(maxWidth, maxHeight).coerceAtMost(480.dp)
@@ -108,18 +131,41 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
                     position = game.positionAt(ply),
                     modifier = Modifier.size(side),
                     lastMove = if (ply > 0) game.moveAt(ply - 1) else null,
+                    arrows = arrows,
                 )
             }
         }
 
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { ply = 0 }, enabled = ply > 0) { Text("⏮") }
-            OutlinedButton(onClick = { ply-- }, enabled = ply > 0) { Text("◀") }
-            OutlinedButton(onClick = { ply++ }, enabled = ply < game.plyCount) { Text("▶") }
-            OutlinedButton(onClick = { ply = nextMistake(game, done, mySide, ply) }, enabled = hasNextMistake(game, done, mySide, ply)) {
-                Text("다음 실수")
+        // Legend so the colours are self-explanatory.
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "화살표 — 초록/노랑/빨강: 내가 둔 수(좋음/부정확/실수)   ·   파랑: 더 좋았던 수",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+
+        Spacer(Modifier.height(8.dp))
+        var autoplay by remember { mutableStateOf(false) }
+        LaunchedEffect(autoplay, ply) {
+            if (autoplay) {
+                if (ply < game.plyCount) {
+                    kotlinx.coroutines.delay(1100)
+                    ply++
+                } else {
+                    autoplay = false
+                }
             }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { ply = 0; autoplay = false }, enabled = ply > 0) { Text("⏮") }
+            OutlinedButton(onClick = { ply--; autoplay = false }, enabled = ply > 0) { Text("◀") }
+            OutlinedButton(onClick = { autoplay = !autoplay }) { Text(if (autoplay) "⏸ 정지" else "▶ 자동재생") }
+            OutlinedButton(onClick = { ply++; autoplay = false }, enabled = ply < game.plyCount) { Text("▶") }
+            OutlinedButton(
+                onClick = { ply = nextMistake(game, done, mySide, ply); autoplay = false },
+                enabled = hasNextMistake(game, done, mySide, ply),
+            ) { Text("다음 실수") }
         }
     }
 }

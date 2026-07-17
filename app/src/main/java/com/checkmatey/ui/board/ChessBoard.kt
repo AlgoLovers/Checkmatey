@@ -2,6 +2,7 @@ package com.checkmatey.ui.board
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,8 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -63,6 +66,7 @@ fun ChessBoard(
     targets: Set<Square> = emptySet(),
     lastMove: Move? = null,
     hintSquares: Set<Square> = emptySet(),
+    arrows: List<BoardArrow> = emptyList(),
     onSquareClick: ((Square) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier.aspectRatio(1f)) {
@@ -153,7 +157,53 @@ fun ChessBoard(
                 }
             }
         }
+
+        // Arrows drawn over the board (e.g. your move vs. the better move in review).
+        if (arrows.isNotEmpty()) {
+            val cellPx = with(LocalDensity.current) { cell.toPx() }
+            Canvas(Modifier.matchParentSize()) {
+                for (arrow in arrows) {
+                    fun center(sq: Square) = Offset(
+                        x = (sq.file + 0.5f) * cellPx,
+                        y = (7 - sq.rank + 0.5f) * cellPx,
+                    )
+                    drawArrow(center(arrow.from), center(arrow.to), arrow.color, cellPx)
+                }
+            }
+        }
     }
+}
+
+/** An arrow to draw on the board, from [from] to [to]. */
+data class BoardArrow(val from: Square, val to: Square, val color: Color)
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawArrow(
+    start: Offset,
+    end: Offset,
+    color: Color,
+    cellPx: Float,
+) {
+    val dx = end.x - start.x
+    val dy = end.y - start.y
+    val len = kotlin.math.hypot(dx, dy)
+    if (len < 1f) return
+    val ux = dx / len
+    val uy = dy / len
+    val head = cellPx * 0.42f
+    val width = cellPx * 0.16f
+    // Shaft stops short so the arrowhead sits cleanly on the target square.
+    val shaftEnd = Offset(end.x - ux * head, end.y - uy * head)
+    drawLine(color = color, start = start, end = shaftEnd, strokeWidth = width, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+    // Arrowhead triangle.
+    val perpX = -uy
+    val perpY = ux
+    val tip = end
+    val baseL = Offset(shaftEnd.x + perpX * head * 0.6f, shaftEnd.y + perpY * head * 0.6f)
+    val baseR = Offset(shaftEnd.x - perpX * head * 0.6f, shaftEnd.y - perpY * head * 0.6f)
+    val path = Path().apply {
+        moveTo(tip.x, tip.y); lineTo(baseL.x, baseL.y); lineTo(baseR.x, baseR.y); close()
+    }
+    drawPath(path, color)
 }
 
 // Border color marking the hint (best-move) squares.
