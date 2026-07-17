@@ -84,7 +84,8 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     val humanColor = PieceColor.WHITE
 
     var level by rememberSaveable { mutableStateOf(BotLevel.BEGINNER) }
-    var adaptive by rememberSaveable { mutableStateOf(false) }
+    // Adaptive on by default so the bot always matches the player without them knowing to toggle it.
+    var adaptive by rememberSaveable { mutableStateOf(true) }
     var soundOn by remember { mutableStateOf(store.soundOn) }
     var position by rememberSaveable(stateSaver = PositionSaver) { mutableStateOf(Position.startingPosition()) }
     var selected by remember { mutableStateOf<Square?>(null) }

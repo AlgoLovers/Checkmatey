@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -26,7 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import com.checkmatey.core.plan.StepTarget
 import com.checkmatey.data.UserStore
+import com.checkmatey.feature.home.HomeScreen
 import com.checkmatey.feature.lesson.LessonScreen
 import com.checkmatey.feature.onboarding.OnboardingScreen
 import com.checkmatey.feature.play.PlayScreen
@@ -36,6 +39,7 @@ import com.checkmatey.feature.study.StudyScreen
 
 /** Top-level tabs. */
 private enum class TopDestination(val label: String, val icon: ImageVector) {
+    HOME("홈", Icons.Filled.Home),
     LESSONS("레슨", Icons.Filled.Edit),
     LEARN("명국", Icons.Filled.Star),
     PLAY("대국", Icons.Filled.PlayArrow),
@@ -59,8 +63,17 @@ fun CheckmateyApp() {
         return
     }
 
-    var selectedIndex by rememberSaveable { mutableIntStateOf(TopDestination.PLAY.ordinal) }
+    var selectedIndex by rememberSaveable { mutableIntStateOf(TopDestination.HOME.ordinal) }
     val current = TopDestination.entries[selectedIndex]
+
+    fun goTo(target: StepTarget) {
+        selectedIndex = when (target) {
+            StepTarget.LESSON -> TopDestination.LESSONS
+            StepTarget.PUZZLE -> TopDestination.PUZZLES
+            StepTarget.PLAY -> TopDestination.PLAY
+            StepTarget.REVIEW -> TopDestination.PROFILE
+        }.ordinal
+    }
 
     // Apply the status bar / cutout / (tablet) rail insets *around* the scaffold, so they aren't
     // already consumed by the time content is laid out. The bottom nav bar keeps the bottom inset.
@@ -82,6 +95,7 @@ fun CheckmateyApp() {
             },
         ) {
             when (current) {
+                TopDestination.HOME -> HomeScreen(onGo = ::goTo)
                 TopDestination.LESSONS -> LessonScreen()
                 TopDestination.LEARN -> StudyScreen()
                 TopDestination.PLAY -> PlayScreen()

@@ -58,6 +58,7 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val store = remember { com.checkmatey.data.UserStore(context) }
+    LaunchedEffect(game) { store.reviewedLatestGame = true }
     LaunchedEffect(game) {
         val list = ArrayList<MoveAnnotation>(game.plyCount)
         for (i in game.moves.indices) {

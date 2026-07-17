@@ -46,7 +46,13 @@ class UserStore(context: Context) {
     fun saveGame(result: String, uciMoves: List<String>) {
         if (uciMoves.isEmpty()) return
         recentGames = listOf("$result|${uciMoves.joinToString(",")}") + recentGames
+        reviewedLatestGame = false
     }
+
+    /** Whether the most recent game has been opened in review (drives the home nudge). */
+    var reviewedLatestGame: Boolean
+        get() = prefs.getBoolean(KEY_REVIEWED, false)
+        set(value) = prefs.edit().putBoolean(KEY_REVIEWED, value).apply()
 
     /** Ids of lessons the user has finished. */
     var completedLessons: Set<String>
@@ -122,5 +128,6 @@ class UserStore(context: Context) {
         const val KEY_DRILLS = "completedDrills"
         const val KEY_REC_THEMES = "recommendedThemes"
         const val KEY_RATING_HIST = "ratingHistory"
+        const val KEY_REVIEWED = "reviewedLatestGame"
     }
 }
