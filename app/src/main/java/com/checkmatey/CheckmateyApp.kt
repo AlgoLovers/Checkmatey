@@ -24,7 +24,7 @@ private enum class TopDestination(val label: String, val icon: ImageVector) {
     LEARN("명국", Icons.Filled.Star),
     PLAY("Play", Icons.Filled.PlayArrow),
     PUZZLES("Puzzles", Icons.Filled.Search),
-    PROFILE("Profile", Icons.Filled.Person),
+    PROFILE("분석", Icons.Filled.Person),
 }
 
 /**

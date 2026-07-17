@@ -31,6 +31,20 @@ object StudyGames {
     /** All bundled master games, ready to replay. */
     fun all(): List<StudyGame> = PgnParser.parse(MasterGames.PGN).map { build(it) }
 
+    /** Build a game from a played move list (e.g. your game vs the computer) for review. */
+    fun fromMoves(moves: List<Move>, white: String = "나", black: String = "컴퓨터"): StudyGame {
+        var pos = Position.startingPosition()
+        val sans = ArrayList<String>()
+        val positions = ArrayList<Position>().apply { add(pos) }
+        for (move in moves) {
+            sans.add(pos.toSan(move))
+            pos = pos.applyMove(move)
+            positions.add(pos)
+        }
+        val meta = PgnGame(mapOf("White" to white, "Black" to black, "Result" to "*"), sans)
+        return StudyGame(meta, moves.toList(), sans, positions)
+    }
+
     fun build(pgn: PgnGame): StudyGame {
         var pos = Position.startingPosition()
         val moves = ArrayList<Move>()

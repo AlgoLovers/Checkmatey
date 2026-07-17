@@ -23,6 +23,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,6 +48,8 @@ import com.checkmatey.core.engine.BotLevel
 import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.core.engine.MoveAnnotation
 import com.checkmatey.core.engine.MoveQuality
+import com.checkmatey.core.study.StudyGames
+import com.checkmatey.feature.review.ReviewScreen
 import com.checkmatey.ui.board.ChessBoard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -78,6 +81,14 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     var coachOn by rememberSaveable { mutableStateOf(true) }
     var hint by remember { mutableStateOf<MoveAnnotation?>(null) }
     var feedback by remember { mutableStateOf<MoveAnnotation?>(null) }
+    val moves = remember { mutableStateListOf<Move>() }
+    var reviewing by remember { mutableStateOf(false) }
+
+    if (reviewing) {
+        val reviewGame = remember(reviewing) { StudyGames.fromMoves(moves.toList()) }
+        ReviewScreen(game = reviewGame, mySide = humanColor, onBack = { reviewing = false }, modifier = modifier)
+        return
+    }
 
     val isHumanTurn = position.sideToMove == humanColor && !position.isGameOver()
     val isStart = position.toFen() == Position.STARTING_FEN
@@ -88,6 +99,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
 
     fun applyMove(move: Move) {
         position = position.applyMove(move)
+        moves.add(move)
         lastMove = move
         hint = null
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -95,6 +107,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
 
     fun newGame() {
         position = Position.startingPosition()
+        moves.clear()
         selected = null
         lastMove = null
         hint = null
@@ -174,7 +187,10 @@ fun PlayScreen(modifier: Modifier = Modifier) {
 
         CoachCard(hint = hint, feedback = feedback.takeIf { coachOn })
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = ::newGame) { Text("새 게임") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { reviewing = true }, enabled = moves.isNotEmpty()) { Text("📊 분석") }
+            OutlinedButton(onClick = ::newGame) { Text("새 게임") }
+        }
     }
 
     if (position.isGameOver() && !gameOverSeen) {
@@ -184,7 +200,11 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             title = { Text(title) },
             text = { Text(detail) },
             confirmButton = { TextButton(onClick = ::newGame) { Text("새 게임") } },
-            dismissButton = { TextButton(onClick = { gameOverSeen = true }) { Text("보드 보기") } },
+            dismissButton = {
+                TextButton(onClick = { gameOverSeen = true; reviewing = true }, enabled = moves.isNotEmpty()) {
+                    Text("📊 분석하기")
+                }
+            },
         )
     }
 }
