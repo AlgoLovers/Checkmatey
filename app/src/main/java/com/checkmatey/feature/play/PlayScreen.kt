@@ -1,6 +1,7 @@
 package com.checkmatey.feature.play
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
@@ -282,12 +285,15 @@ private fun Toggle(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
 
 @Composable
 private fun RatingSelector(selected: BotLevel, onSelect: (BotLevel) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         for (level in BotLevel.entries) {
             val isSel = level == selected
             Surface(
                 onClick = { onSelect(level) },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(64.dp),
                 shape = RoundedCornerShape(10.dp),
                 color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                 contentColor = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,

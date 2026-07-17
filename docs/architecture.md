@@ -11,15 +11,25 @@
 
 ```
 com.checkmatey
-├─ MainActivity          진입점. enableEdgeToEdge + CheckmateyTheme
-├─ CheckmateyApp         적응형 네비게이션 루트
-├─ ui/theme              Material 3 색·타이포·테마 (다이내믹 컬러 지원)
-├─ ui/board              ChessBoard 등 재사용 체스 UI (도메인에 의존, 화면에는 비의존)
-├─ feature/<name>        화면 단위: learn · play · puzzles · profile (+ common)
-└─ core/chess            순수 Kotlin 도메인. Android 의존 없음 → JVM 유닛테스트로 빠르게 검증
+├─ MainActivity                 진입점. enableEdgeToEdge + CheckmateyTheme
+├─ CheckmateyApp                적응형 네비게이션 루트 (명국 / Play / 퍼즐 / 분석)
+├─ ui/theme, ui/board           Material 3 테마 · ChessBoard(선택·목적지·최근수·힌트·슬라이드 애니메이션)
+├─ feature/
+│  ├─ play                      대국(봇·코치·힌트·적응 난이도) + 대국 후 "분석" 진입
+│  ├─ puzzles                   전술 퍼즐 트레이너(레이팅·적응·약점 집중·복습)
+│  ├─ study                     명국 리플레이 + 다음 수 맞히기
+│  ├─ review                    게임 리뷰(내 게임/PGN 전 수 코치 채점) — play·profile이 공유
+│  └─ profile("분석")           PGN 붙여넣기 → 리뷰
+├─ data/                        UserStore (레이팅·연속·약점·복습 큐 영속, SharedPreferences)
+└─ core/                        순수 Kotlin. Android 의존 없음 → JVM 유닛테스트로 빠르게 검증
+   ├─ chess                     Position·Move·규칙·SAN·FEN (perft 검증)
+   ├─ engine                    KotlinMinimaxEngine(알파베타+quiescence), Annotator(코치), GameReviewer, BotLevel
+   ├─ study                     PGN 파서 · StudyGame(재생) · 명국 데이터
+   └─ puzzle                    Puzzle 데이터 · Elo Rating · 적응 선택
 ```
 
-의존 방향: `feature → ui → core`. **`core`는 아무것도 위로 의존하지 않는다.**
+의존 방향: `feature → data → core`. **`core`는 아무것도 위로 의존하지 않는다.**
+`core`는 순수 Kotlin이라 테스트가 빠르다(현재 43개). `data`만 Android(SharedPreferences)에 의존.
 
 ### 왜 이렇게?
 - `core/chess`가 순수 Kotlin이면 `testDebugUnitTest`(수 초)로 규칙을 고정할 수 있다. 체스 규칙은

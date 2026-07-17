@@ -1,5 +1,12 @@
 package com.checkmatey
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -13,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.checkmatey.feature.play.PlayScreen
 import com.checkmatey.feature.profile.ProfileScreen
@@ -50,11 +58,19 @@ fun CheckmateyApp() {
             }
         },
     ) {
-        when (current) {
-            TopDestination.LEARN -> StudyScreen()
-            TopDestination.PLAY -> PlayScreen()
-            TopDestination.PUZZLES -> PuzzlesScreen()
-            TopDestination.PROFILE -> ProfileScreen()
+        // Keep content clear of the status bar / display cutout / (tablet) nav rail.
+        // The bottom nav bar's inset is handled by the scaffold itself.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+        ) {
+            when (current) {
+                TopDestination.LEARN -> StudyScreen()
+                TopDestination.PLAY -> PlayScreen()
+                TopDestination.PUZZLES -> PuzzlesScreen()
+                TopDestination.PROFILE -> ProfileScreen()
+            }
         }
     }
 }

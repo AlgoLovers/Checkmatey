@@ -1,8 +1,11 @@
 package com.checkmatey.feature.puzzles
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +60,9 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     var bestStreak by remember { mutableIntStateOf(store.bestStreak) }
     var solvedCount by remember { mutableIntStateOf(store.solvedCount) }
     var solvedIds by remember { mutableStateOf(emptySet<String>()) }
+    var reviewIds by remember { mutableStateOf(store.reviewIds) }
+    var weakest by remember { mutableStateOf(store.weakestTheme()) }
+    var focusWeakness by rememberSaveable { mutableStateOf(false) }
 
     var puzzle by remember { mutableStateOf(Puzzles.next(store.puzzleRating, emptySet())) }
     val solution = remember(puzzle) { engine.bestMove(puzzle.position, 4) }
@@ -73,7 +80,12 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
 
     fun loadNext() {
         solvedIds = solvedIds + puzzle.id
-        puzzle = Puzzles.next(rating, solvedIds)
+        puzzle = Puzzles.next(
+            rating = rating,
+            solved = solvedIds,
+            reviewIds = reviewIds,
+            themeFilter = if (focusWeakness) weakest else null,
+        )
         selected = null
         state = PuzzleState.SOLVING
     }
@@ -97,6 +109,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
         selected = null
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         val correct = solution != null && move.from == solution.from && move.to == solution.to
+        store.recordTheme(puzzle.theme, correct)
         if (correct) {
             rating = Rating.update(rating, puzzle.rating, true)
             store.puzzleRating = rating
@@ -108,14 +121,17 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
                 bestStreak = streak
                 store.bestStreak = bestStreak
             }
+            reviewIds = (reviewIds - puzzle.id).also { store.reviewIds = it } // solved -> off the review queue
             state = PuzzleState.SOLVED
         } else {
             rating = Rating.update(rating, puzzle.rating, false)
             store.puzzleRating = rating
             streak = 0
             store.streak = 0
+            reviewIds = (reviewIds + puzzle.id).also { store.reviewIds = it } // missed -> review later
             state = PuzzleState.FAILED
         }
+        weakest = store.weakestTheme()
     }
 
     Column(
@@ -123,6 +139,14 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         StatBar(rating = rating, streak = streak, bestStreak = bestStreak, solved = solvedCount)
+        Spacer(Modifier.height(6.dp))
+        WeaknessRow(
+            focus = focusWeakness,
+            onToggle = { focusWeakness = it },
+            weakest = weakest,
+            weakestRate = weakest?.let { store.successRate(it) },
+            reviewCount = reviewIds.size,
+        )
         Spacer(Modifier.height(10.dp))
         StatusCard(
             state = state,
@@ -157,6 +181,40 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun WeaknessRow(
+    focus: Boolean,
+    onToggle: (Boolean) -> Unit,
+    weakest: String?,
+    weakestRate: Int?,
+    reviewCount: Int,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            onClick = { onToggle(!focus) },
+            shape = RoundedCornerShape(8.dp),
+            color = if (focus) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            contentColor = if (focus) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+            border = if (focus) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Text("약점 집중 ${if (focus) "✓" else ""}".trim(), Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium)
+        }
+        val label = buildString {
+            if (weakest != null) append("약점: $weakest ${weakestRate ?: 0}%")
+            if (reviewCount > 0) {
+                if (isNotEmpty()) append("  ·  ")
+                append("복습 $reviewCount")
+            }
+            if (isEmpty()) append("풀수록 약점을 찾아 드립니다")
+        }
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

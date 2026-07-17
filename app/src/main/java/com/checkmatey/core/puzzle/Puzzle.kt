@@ -26,9 +26,25 @@ object Puzzles {
         Puzzle("p8", "2r3k1/5ppp/8/8/8/8/5PPP/2Q3K1 w - - 0 1", "백랭크", 1000),
     )
 
-    /** Picks an unsolved puzzle whose rating is near [rating]; falls back to any if all are solved. */
-    fun next(rating: Int, solved: Set<String>, random: Random = Random.Default): Puzzle {
-        val pool = ALL.filter { it.id !in solved }.ifEmpty { ALL }
+    /**
+     * Picks the next puzzle. Spaced repetition: a previously-missed puzzle ([reviewIds]) is
+     * re-served part of the time. Weakness focus: [themeFilter] restricts to one theme. Otherwise
+     * an unsolved puzzle near [rating] is chosen so difficulty tracks the player.
+     */
+    fun next(
+        rating: Int,
+        solved: Set<String>,
+        random: Random = Random.Default,
+        reviewIds: List<String> = emptyList(),
+        themeFilter: String? = null,
+    ): Puzzle {
+        val reviewPool = ALL.filter { it.id in reviewIds }
+        if (reviewPool.isNotEmpty() && random.nextDouble() < 0.5) {
+            return reviewPool[random.nextInt(reviewPool.size)]
+        }
+        var pool = ALL.filter { it.id !in solved }
+        if (themeFilter != null) pool = pool.filter { it.theme == themeFilter }.ifEmpty { pool }
+        if (pool.isEmpty()) pool = ALL
         val closest = pool.sortedBy { abs(it.rating - rating) }.take(3)
         return closest[random.nextInt(closest.size)]
     }

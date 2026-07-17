@@ -3,6 +3,7 @@ package com.checkmatey.core.engine
 import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -69,6 +70,17 @@ class EngineTest {
         assertEquals(BotLevel.BEGINNER, BotLevel.forRating(700))
         assertEquals(BotLevel.INTERMEDIATE, BotLevel.forRating(1000))
         assertEquals(BotLevel.CHALLENGER, BotLevel.forRating(1300))
+        assertEquals(BotLevel.EXPERT, BotLevel.forRating(1600))
+        assertEquals(BotLevel.MASTER, BotLevel.forRating(1900))
+    }
+
+    @Test
+    fun quiescenceAvoidsThePoisonedPawn() {
+        // The pawn on d5 is defended by c6; grabbing it with the bishop loses material.
+        // A depth-1 static search would take it — quiescence sees the recapture and declines.
+        val pos = Position.fromFen("4k3/8/2p5/3p4/4B3/8/8/4K3 w - - 0 1")
+        val move = engine.bestMove(pos, depth = 1)
+        assertNotEquals(Square.fromName("d5"), move?.to)
     }
 
     @Test
