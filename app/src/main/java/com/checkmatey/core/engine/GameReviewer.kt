@@ -28,6 +28,25 @@ class GameReviewer(private val annotator: Annotator) {
         return ReviewSummary(counts, accuracy)
     }
 
+    /**
+     * Puzzle themes worth drilling based on the mistakes/blunders in [annotations] — derived from
+     * the reason text of the move that would have been better. Lets the app turn "you missed a
+     * fork here" into "practice fork puzzles".
+     */
+    fun weakThemes(annotations: List<MoveAnnotation>): List<String> {
+        val themes = LinkedHashSet<String>()
+        for (a in annotations) {
+            if (a.quality.ordinal < MoveQuality.MISTAKE.ordinal) continue
+            val reason = a.reason
+            when {
+                "포크" in reason -> themes += "포크"
+                "체크메이트" in reason -> themes += "백랭크 메이트"
+                "잡아" in reason || "이득" in reason -> themes += "기물 이득"
+            }
+        }
+        return themes.toList()
+    }
+
     private fun weight(quality: MoveQuality): Double = when (quality) {
         MoveQuality.BEST -> 1.0
         MoveQuality.GOOD -> 0.9

@@ -64,6 +64,8 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     var reviewIds by remember { mutableStateOf(store.reviewIds) }
     var weakest by remember { mutableStateOf(store.weakestTheme()) }
     var focusWeakness by rememberSaveable { mutableStateOf(false) }
+    // Themes the last game review flagged (review -> targeted practice).
+    var recommended by remember { mutableStateOf(store.recommendedThemes.firstOrNull { t -> Puzzles.ALL.any { it.theme == t } }) }
 
     var puzzle by remember { mutableStateOf(Puzzles.next(store.puzzleRating, emptySet())) }
     val solution = remember(puzzle) { engine.bestMove(puzzle.position, 4) }
@@ -86,7 +88,11 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             rating = rating,
             solved = solvedIds,
             reviewIds = reviewIds,
-            themeFilter = if (focusWeakness) weakest else null,
+            themeFilter = when {
+                recommended != null -> recommended
+                focusWeakness -> weakest
+                else -> null
+            },
         )
         selected = null
         lastMove = null
@@ -144,6 +150,23 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         StatBar(rating = rating, streak = streak, bestStreak = bestStreak, solved = solvedCount)
+        recommended?.let { theme ->
+            Spacer(Modifier.height(6.dp))
+            Surface(
+                onClick = { store.recommendedThemes = emptyList(); recommended = null; loadNext() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ) {
+                Text(
+                    "🎯 복기에서 찾은 약점: \"$theme\" — 지금 이 테마를 훈련 중입니다 (탭하면 일반 퍼즐로)",
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
         Spacer(Modifier.height(6.dp))
         WeaknessRow(
             focus = focusWeakness,

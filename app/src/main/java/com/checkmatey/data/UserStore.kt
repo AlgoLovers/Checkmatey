@@ -53,6 +53,16 @@ class UserStore(context: Context) {
         get() = prefs.getString(KEY_LESSONS, "").orEmpty().split(",").filter { it.isNotBlank() }.toSet()
         set(value) = prefs.edit().putString(KEY_LESSONS, value.joinToString(",")).apply()
 
+    /** Ids of endgame drills the user has beaten (delivered mate). */
+    var completedDrills: Set<String>
+        get() = prefs.getString(KEY_DRILLS, "").orEmpty().split(",").filter { it.isNotBlank() }.toSet()
+        set(value) = prefs.edit().putString(KEY_DRILLS, value.joinToString(",")).apply()
+
+    /** Puzzle themes recommended by the last game review (weak spots to drill). */
+    var recommendedThemes: List<String>
+        get() = prefs.getString(KEY_REC_THEMES, "").orEmpty().split(",").filter { it.isNotBlank() }
+        set(value) = prefs.edit().putString(KEY_REC_THEMES, value.joinToString(",")).apply()
+
     /** Ids of previously-missed puzzles, queued for spaced-repetition review. */
     var reviewIds: List<String>
         get() = prefs.getString(KEY_REVIEW, "").orEmpty().split(",").filter { it.isNotBlank() }
@@ -100,5 +110,7 @@ class UserStore(context: Context) {
         const val KEY_ONBOARDED = "onboardingSeen"
         const val KEY_LESSONS = "completedLessons"
         const val KEY_GAMES = "recentGames"
+        const val KEY_DRILLS = "completedDrills"
+        const val KEY_REC_THEMES = "recommendedThemes"
     }
 }

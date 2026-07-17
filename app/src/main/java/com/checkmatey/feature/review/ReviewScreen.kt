@@ -56,6 +56,8 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
     var progress by remember { mutableIntStateOf(0) }
     var ply by remember { mutableIntStateOf(0) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val store = remember { com.checkmatey.data.UserStore(context) }
     LaunchedEffect(game) {
         val list = ArrayList<MoveAnnotation>(game.plyCount)
         for (i in game.moves.indices) {
@@ -64,6 +66,10 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
             progress = i + 1
         }
         annotations = list.toList()
+        // Feed my weak themes (from this game's mistakes on my side) into the puzzle trainer.
+        val mine = list.filterIndexed { i, _ -> game.positions[i].sideToMove == mySide }
+        val themes = reviewer.weakThemes(mine)
+        if (themes.isNotEmpty()) store.recommendedThemes = themes
     }
 
     Column(

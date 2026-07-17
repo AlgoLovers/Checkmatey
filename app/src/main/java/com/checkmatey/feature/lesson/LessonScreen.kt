@@ -43,11 +43,11 @@ import com.checkmatey.data.UserStore
 import com.checkmatey.ui.board.ChessBoard
 
 /** Endgame drills played against the engine (it defends for real). */
-private data class PracticeDrill(val title: String, val subtitle: String, val fen: String)
+private data class PracticeDrill(val id: String, val title: String, val subtitle: String, val fen: String)
 
 private val PRACTICE_DRILLS = listOf(
-    PracticeDrill("킹+퀸 메이트 실습", "엔진을 상대로 직접 몰아넣기", "8/8/8/4k3/8/8/8/2QK4 w - - 0 1"),
-    PracticeDrill("킹+룩 메이트 실습", "상자 기술을 실전으로", "8/8/8/4k3/8/8/8/2RK4 w - - 0 1"),
+    PracticeDrill("kq", "킹+퀸 메이트 실습", "엔진을 상대로 직접 몰아넣기", "8/8/8/4k3/8/8/8/2QK4 w - - 0 1"),
+    PracticeDrill("kr", "킹+룩 메이트 실습", "상자 기술을 실전으로", "8/8/8/4k3/8/8/8/2RK4 w - - 0 1"),
 )
 
 /** Lessons tab: a beginner curriculum of guided, hands-on lessons plus engine practice. */
@@ -56,12 +56,13 @@ fun LessonScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val store = remember { UserStore(context) }
     var completed by remember { mutableStateOf(store.completedLessons) }
+    val completedDrills = store.completedDrills
     var openIndex by rememberSaveable { mutableIntStateOf(-1) }
     var practiceIndex by rememberSaveable { mutableIntStateOf(-1) }
 
     if (practiceIndex in PRACTICE_DRILLS.indices) {
         val drill = PRACTICE_DRILLS[practiceIndex]
-        PracticeScreen(title = drill.title, startFen = drill.fen, onBack = { practiceIndex = -1 }, modifier = modifier)
+        PracticeScreen(drillId = drill.id, title = drill.title, startFen = drill.fen, onBack = { practiceIndex = -1 }, modifier = modifier)
         return
     }
     if (openIndex in Lessons.ALL.indices) {
@@ -77,6 +78,7 @@ fun LessonScreen(modifier: Modifier = Modifier) {
     } else {
         LessonList(
             completed = completed,
+            completedDrills = completedDrills,
             onOpen = { openIndex = it },
             onOpenPractice = { practiceIndex = it },
             modifier = modifier,
@@ -87,6 +89,7 @@ fun LessonScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun LessonList(
     completed: Set<String>,
+    completedDrills: Set<String>,
     onOpen: (Int) -> Unit,
     onOpenPractice: (Int) -> Unit,
     modifier: Modifier,
@@ -131,15 +134,19 @@ private fun LessonList(
             }
             items(PRACTICE_DRILLS.size) { index ->
                 val drill = PRACTICE_DRILLS[index]
+                val done = drill.id in completedDrills
                 Surface(
                     onClick = { onOpenPractice(index) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    color = if (done) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
                 ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(drill.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(drill.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(drill.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(drill.subtitle, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (done) Text("✓ 성공", style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }

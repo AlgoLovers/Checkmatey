@@ -46,9 +46,11 @@ import kotlinx.coroutines.withContext
  * Stalemate counts as a miss — that's the classic trap this practice teaches.
  */
 @Composable
-fun PracticeScreen(title: String, startFen: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun PracticeScreen(drillId: String, title: String, startFen: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val engine = remember { KotlinMinimaxEngine() }
     val haptic = LocalHapticFeedback.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val store = remember { com.checkmatey.data.UserStore(context) }
     val humanColor = remember(startFen) { Position.fromFen(startFen).sideToMove }
 
     var position by remember(startFen) { mutableStateOf(Position.fromFen(startFen)) }
@@ -123,6 +125,7 @@ fun PracticeScreen(title: String, startFen: String, onBack: () -> Unit, modifier
 
         val scheme = MaterialTheme.colorScheme
         val won = position.isCheckmate() && position.sideToMove != humanColor
+        if (won) LaunchedEffect(drillId) { store.completedDrills = store.completedDrills + drillId }
         val drawn = !won && position.isGameOver() // stalemate, insufficient material, fifty-move
         val (text, container, onContainer) = when {
             won -> Triple("성공! 체크메이트 ✓  ($plies 수)", scheme.tertiaryContainer, scheme.onTertiaryContainer)
