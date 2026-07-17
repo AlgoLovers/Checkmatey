@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,6 +37,7 @@ import com.checkmatey.core.study.StudyGame
 import com.checkmatey.core.study.StudyGames
 import com.checkmatey.data.UserStore
 import com.checkmatey.feature.review.ReviewScreen
+import com.checkmatey.ui.Sparkline
 
 /**
  * 분석 tab — the review hub. It lists the games you actually played (saved automatically when a
@@ -58,6 +60,8 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
     }
 
     Column(modifier.fillMaxSize().padding(16.dp)) {
+        ProgressCard(store)
+        Spacer(Modifier.height(14.dp))
         Text("분석 (복기)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(
             "둔 게임을 코치가 한 수씩 채점합니다 — 어디서 실수했고 무엇이 더 좋았는지. 복기는 실력 향상의 가장 빠른 길입니다.",
@@ -141,6 +145,50 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                 },
                 enabled = pgnText.isNotBlank(),
             ) { Text("분석하기") }
+        }
+    }
+}
+
+@Composable
+private fun ProgressCard(store: UserStore) {
+    val rating = store.puzzleRating
+    val history = store.ratingHistory
+    val lessons = store.completedLessons.size
+    val drills = store.completedDrills.size
+    val bestStreak = store.bestStreak
+    val trend = if (history.size >= 2) history.last() - history.first() else 0
+
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("내 실력", style = MaterialTheme.typography.labelMedium)
+                    Text("레이팅 $rating", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    if (history.size >= 2) {
+                        val sign = if (trend >= 0) "▲ +$trend" else "▼ $trend"
+                        Text("$sign  (최근 ${history.size}문제)", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                Sparkline(
+                    values = history,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.height(48.dp).width(120.dp),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "레슨 $lessons/12  ·  엔드게임 실습 $drills/2  ·  최고 연속 $bestStreak",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (history.size < 2) {
+                Spacer(Modifier.height(4.dp))
+                Text("[퍼즐] 탭에서 문제를 풀면 여기에 실력 그래프가 그려집니다.", style = MaterialTheme.typography.labelSmall)
+            }
         }
     }
 }

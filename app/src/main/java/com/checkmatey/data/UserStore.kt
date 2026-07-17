@@ -99,6 +99,15 @@ class UserStore(context: Context) {
         return if (att == 0) 0 else (ok * 100 / att)
     }
 
+    /** Last N puzzle ratings, oldest first — for the progress sparkline. */
+    var ratingHistory: List<Int>
+        get() = prefs.getString(KEY_RATING_HIST, "").orEmpty().split(",").mapNotNull { it.toIntOrNull() }
+        set(value) = prefs.edit().putString(KEY_RATING_HIST, value.takeLast(40).joinToString(",")).apply()
+
+    fun pushRating(rating: Int) {
+        ratingHistory = ratingHistory + rating
+    }
+
     private companion object {
         const val KEY_RATING = "puzzleRating"
         const val KEY_SOLVED = "solvedCount"
@@ -112,5 +121,6 @@ class UserStore(context: Context) {
         const val KEY_GAMES = "recentGames"
         const val KEY_DRILLS = "completedDrills"
         const val KEY_REC_THEMES = "recommendedThemes"
+        const val KEY_RATING_HIST = "ratingHistory"
     }
 }

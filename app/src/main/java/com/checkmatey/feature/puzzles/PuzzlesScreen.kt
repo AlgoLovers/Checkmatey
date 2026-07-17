@@ -142,6 +142,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
         }
         // Play the solution move on the board (animated) so the right move is always shown.
         solution?.let { displayPos = puzzle.position.applyMove(it); lastMove = it }
+        store.pushRating(rating)
         weakest = store.weakestTheme()
     }
 
