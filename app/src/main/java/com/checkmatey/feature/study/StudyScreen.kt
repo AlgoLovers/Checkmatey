@@ -20,6 +20,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,9 +37,13 @@ import androidx.compose.ui.unit.dp
 import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
+import com.checkmatey.core.engine.Annotator
+import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.core.study.StudyGame
 import com.checkmatey.core.study.StudyGames
 import com.checkmatey.ui.board.ChessBoard
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Learn tab: pick a master game, then replay it or test yourself with "guess the move". */
 @Composable
@@ -88,6 +93,7 @@ private fun GameList(games: List<StudyGame>, onSelect: (Int) -> Unit, modifier: 
 @Composable
 private fun GameDetail(game: StudyGame, onBack: () -> Unit, modifier: Modifier) {
     val haptic = LocalHapticFeedback.current
+    val annotator = remember { Annotator(KotlinMinimaxEngine(), depth = 2) }
     var ply by rememberSaveable(game.title) { mutableIntStateOf(0) }
     var guessMode by rememberSaveable(game.title) { mutableStateOf(false) }
     var correct by rememberSaveable(game.title) { mutableIntStateOf(0) }
@@ -108,6 +114,21 @@ private fun GameDetail(game: StudyGame, onBack: () -> Unit, modifier: Modifier) 
         ply = target.coerceIn(0, game.plyCount)
         selected = null
         feedback = null
+    }
+
+    // Explain the move that produced the current position ("why was the master's move good?").
+    var whyText by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(ply, guessMode) {
+        whyText = null
+        if (!guessMode && ply > 0) {
+            val before = game.positionAt(ply - 1)
+            val played = game.moveAt(ply - 1)
+            if (played != null) {
+                whyText = withContext(Dispatchers.Default) { annotator.annotate(before, played) }.let {
+                    "💡 ${it.quality.label} ${it.quality.symbol} — ${it.reason}"
+                }
+            }
+        }
     }
 
     fun onGuess(square: Square) {
@@ -131,11 +152,12 @@ private fun GameDetail(game: StudyGame, onBack: () -> Unit, modifier: Modifier) 
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         val guessedRight = legal.from == next.from && legal.to == next.to
         val playedSan = game.sans.getOrNull(ply) ?: ""
+        val why = annotator.annotate(position, next).reason
         feedback = if (guessedRight) {
             correct++
-            "정답! ✓  ($playedSan)"
+            "정답! ✓  $playedSan — $why"
         } else {
-            "아쉬워요 — 실제 수는 $playedSan"
+            "아쉬워요 — 실제 수는 $playedSan: $why"
         }
         ply += 1 // reveal the real move (board animates it)
     }
@@ -154,7 +176,7 @@ private fun GameDetail(game: StudyGame, onBack: () -> Unit, modifier: Modifier) 
         }
         Text(game.title, style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        StatusCard(game = game, ply = ply, guessMode = guessMode, position = position, feedback = feedback)
+        StatusCard(game = game, ply = ply, guessMode = guessMode, position = position, feedback = feedback ?: whyText)
         Spacer(Modifier.height(10.dp))
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {

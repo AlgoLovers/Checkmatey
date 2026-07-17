@@ -94,6 +94,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     var coachOn by rememberSaveable { mutableStateOf(true) }
     var hint by remember { mutableStateOf<MoveAnnotation?>(null) }
     var feedback by remember { mutableStateOf<MoveAnnotation?>(null) }
+    var promotionChoice by remember { mutableStateOf<List<Move>>(emptyList()) }
     val moves = remember { mutableStateListOf<Move>() }
     // Position after every ply (starts with the current position) — powers undo and
     // threefold-repetition detection.
@@ -198,6 +199,12 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             return
         }
         val candidates = position.legalMoves().filter { it.from == current && it.to == square }
+        // A promotion offers four pieces — ask instead of silently queening.
+        if (candidates.size > 1 && candidates.all { it.promotion != null }) {
+            promotionChoice = candidates
+            selected = null
+            return
+        }
         val move = candidates.firstOrNull { it.promotion == null } ?: candidates.firstOrNull { it.promotion == PieceType.QUEEN }
         if (move != null) {
             val before = position
@@ -275,6 +282,33 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             }
             store.saveGame(result, moves.map { it.uci() })
         }
+    }
+
+    if (promotionChoice.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { promotionChoice = emptyList() },
+            title = { Text("승격할 기물을 고르세요") },
+            text = {
+                Column {
+                    Text("보통은 가장 강한 퀸을 고릅니다. 드물게 룩/비숍/나이트가 더 좋을 때도 있어요(스테일메이트 회피 등).")
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (option in promotionChoice) {
+                            val type = option.promotion ?: continue
+                            FilledTonalButton(onClick = {
+                                val before = position
+                                applyMove(option)
+                                promotionChoice = emptyList()
+                                feedback = null
+                                if (coachOn) scope.launch { feedback = withContext(Dispatchers.Default) { annotator.annotate(before, option) } }
+                            }) { Text(promotionName(type)) }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { promotionChoice = emptyList() }) { Text("취소") } },
+        )
     }
 
     if (gameEnded && !gameOverSeen) {
@@ -416,6 +450,14 @@ private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boo
             Text(sub, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
         }
     }
+}
+
+private fun promotionName(type: PieceType): String = when (type) {
+    PieceType.QUEEN -> "퀸 ♛"
+    PieceType.ROOK -> "룩 ♜"
+    PieceType.BISHOP -> "비숍 ♝"
+    PieceType.KNIGHT -> "나이트 ♞"
+    else -> type.name
 }
 
 private fun gameOverMessage(position: Position, humanColor: PieceColor, drawReason: String?): Pair<String, String> = when {
