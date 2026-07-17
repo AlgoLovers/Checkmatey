@@ -9,7 +9,7 @@ import com.checkmatey.feature.common.InfoScreen
 fun ProfileScreen(modifier: Modifier = Modifier) {
     InfoScreen(
         title = "Profile",
-        subtitle = "Your progress, rating and settings will live here.",
+        subtitle = "내 레이팅 · 진행 · 설정\n(다음 업데이트에서 추가됩니다)",
         modifier = modifier,
     )
 }

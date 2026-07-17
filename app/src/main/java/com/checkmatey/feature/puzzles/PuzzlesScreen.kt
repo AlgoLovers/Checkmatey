@@ -9,7 +9,7 @@ import com.checkmatey.feature.common.InfoScreen
 fun PuzzlesScreen(modifier: Modifier = Modifier) {
     InfoScreen(
         title = "Puzzles",
-        subtitle = "Daily tactics and rated puzzles will live here.",
+        subtitle = "레이팅 · 테마별 전술 퍼즐 (Lichess CC0)\n(다음 업데이트에서 추가됩니다)",
         modifier = modifier,
     )
 }

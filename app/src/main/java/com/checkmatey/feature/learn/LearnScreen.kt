@@ -9,7 +9,7 @@ import com.checkmatey.feature.common.InfoScreen
 fun LearnScreen(modifier: Modifier = Modifier) {
     InfoScreen(
         title = "Learn",
-        subtitle = "Step-by-step chess lessons will live here.",
+        subtitle = "규칙 · 전술 · 오프닝 레슨\n(다음 업데이트에서 추가됩니다)",
         modifier = modifier,
     )
 }
