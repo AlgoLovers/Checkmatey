@@ -84,6 +84,16 @@ class EngineTest {
     }
 
     @Test
+    fun findsAForcedMateInTwo() {
+        // K+Q vs K: whatever Black replies, mate follows — depth 4 must see a mate score.
+        val pos = Position.fromFen("6k1/8/6K1/8/8/8/8/6Q1 w - - 0 1")
+        val best = engine.bestMove(pos, depth = 4)
+        assertNotNull(best)
+        val score = engine.evaluateMove(pos, best!!, depth = 4)
+        assertTrue("expected a mate score, got $score", score > KotlinMinimaxEngine.MATE - 10)
+    }
+
+    @Test
     fun playsAShortGameWithoutError() {
         var pos = Position.startingPosition()
         val random = Random(42)

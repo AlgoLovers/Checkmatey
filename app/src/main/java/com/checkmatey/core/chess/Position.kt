@@ -68,7 +68,12 @@ class Position(
         }
     }
 
-    private fun pseudoLegalMoves(): List<Move> {
+    /**
+     * Moves that follow piece movement rules but may leave the own king in check.
+     * The engine searches these and validates legality when applying (cheaper than
+     * filtering up front at every node); UI code should use [legalMoves].
+     */
+    fun pseudoLegalMoves(): List<Move> {
         val moves = ArrayList<Move>(48)
         for (rank in 0..7) {
             for (file in 0..7) {
