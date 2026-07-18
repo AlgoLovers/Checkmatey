@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#1B5E20</color>
+    <!-- Window background only. The live UI colours live in the Compose theme (ui/theme/Color.kt);
+         this must match CanvasLight so the pre-Compose window blends in. -->
+    <color name="window_background">#FFF3F5F3</color>
 </resources>

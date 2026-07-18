@@ -1,11 +1,13 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base platform theme; Compose draws the actual Material 3 UI on top.
          Using the built-in platform theme avoids pulling in the legacy Material Components library. -->
     <style name="Theme.Checkmatey" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- The window background matches the light canvas so there's no white flash before Compose draws. -->
+        <item name="android:windowBackground">@color/window_background</item>
+        <!-- The app renders dark mode itself (Compose theme); stop the OS auto-darkening on top (API 29+; ignored below). -->
+        <item name="android:forceDarkAllowed" tools:targetApi="29">false</item>
         <!-- Edge-to-edge (incl. display cutout handling) is set at runtime via enableEdgeToEdge(). -->
-        <!-- windowLayoutInDisplayCutoutMode is intentionally omitted here: it needs API 27, minSdk is 24. -->
-        <!-- If cutout tuning is needed, override it in res/values-v27/themes.xml. -->
     </style>
 </resources>

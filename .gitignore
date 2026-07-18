@@ -41,3 +41,7 @@ Thumbs.db
 # but ignore transient run logs and per-run ledgers.
 loop-run-log.md
 .loop/
+
+# Font subsetting: generated charset + large upstream source (re-fetch when re-subsetting)
+tools/fonts/_charset.txt
+**/PretendardVariable.ttf

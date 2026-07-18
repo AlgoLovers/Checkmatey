@@ -1,0 +1,10 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Dark counterpart of Theme.Checkmatey: dark canvas window background so there's no white flash
+         before Compose draws its dark UI. Paired with values/themes.xml. -->
+    <style name="Theme.Checkmatey" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="29">false</item>
+    </style>
+</resources>

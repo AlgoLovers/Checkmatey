@@ -8,8 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,13 +19,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.checkmatey.core.plan.Planner
 import com.checkmatey.core.plan.Progress
 import com.checkmatey.core.plan.StepTarget
 import com.checkmatey.data.UserStore
 import com.checkmatey.ui.Sparkline
+import com.checkmatey.ui.components.GradientPrimaryButton
+import com.checkmatey.ui.components.StatTile
+import com.checkmatey.ui.theme.Accent
+import com.checkmatey.ui.theme.Amber
+import com.checkmatey.ui.theme.Info
 
 /**
  * Home — the app's front door. It answers "what should I do right now?" with one clear next step,
@@ -46,40 +51,76 @@ fun HomeScreen(onGo: (StepTarget) -> Unit, modifier: Modifier = Modifier) {
     )
     val step = Planner.next(progress)
 
-    Column(modifier.fillMaxSize().padding(20.dp)) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+    ) {
         Text("체스, 오늘도 한 걸음", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        Text("Checkmatey", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("Checkmatey", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(20.dp))
 
-        // The one thing to do now.
+        // The one thing to do now — soft brand card with a raised gradient CTA.
         Surface(
             Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ) {
             Column(Modifier.fillMaxWidth().padding(20.dp)) {
                 Text("👉 지금 할 일", style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
-                Text(step.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(step.title, style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(4.dp))
                 Text(step.subtitle, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = { onGo(step.target) }) { Text(step.cta) }
+                Spacer(Modifier.height(18.dp))
+                GradientPrimaryButton(onClick = { onGo(step.target) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(step.cta, style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
 
         Spacer(Modifier.height(16.dp))
+
+        // Colourful at-a-glance stats.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatTile(
+                label = "내 레이팅",
+                value = "${store.puzzleRating}",
+                icon = "♟️",
+                iconTint = Accent,
+                modifier = Modifier.weight(1f),
+            )
+            StatTile(
+                label = "푼 퍼즐",
+                value = "${progress.puzzlesSolved}",
+                icon = "🧩",
+                iconTint = Info,
+                modifier = Modifier.weight(1f),
+            )
+            StatTile(
+                label = "최고 연속",
+                value = "${store.bestStreak}",
+                icon = "🔥",
+                iconTint = Amber,
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Rating trend + progress line.
         Surface(
             Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(Modifier.fillMaxWidth().padding(20.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text("내 레이팅", style = MaterialTheme.typography.labelMedium)
-                        Text("${store.puzzleRating}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text("레이팅 추이", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${store.puzzleRating}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                     }
                     Sparkline(
                         values = store.ratingHistory,
@@ -87,10 +128,11 @@ fun HomeScreen(onGo: (StepTarget) -> Unit, modifier: Modifier = Modifier) {
                         modifier = Modifier.height(40.dp).fillMaxWidth(0.5f),
                     )
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 Text(
-                    "레슨 ${progress.lessonsDone}/${progress.lessonsTotal}  ·  퍼즐 ${progress.puzzlesSolved}문제  ·  대국 ${progress.gamesPlayed}판  ·  연속 최고 ${store.bestStreak}",
-                    style = MaterialTheme.typography.bodySmall,
+                    "레슨 ${progress.lessonsDone}/${progress.lessonsTotal}  ·  대국 ${progress.gamesPlayed}판",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
