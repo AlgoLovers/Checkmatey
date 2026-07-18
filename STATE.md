@@ -4,7 +4,7 @@
 > 계약/런북은 [`LOOP.md`](LOOP.md), 규칙은 [`CLAUDE.md`](CLAUDE.md).
 
 - **성숙도**: L2 (개발 루프는 PR까지 자동, 머지는 사람)
-- **현재 마일스톤**: M1~M25 완료(main 통합) — 밝은 디자인 시스템으로 비주얼 격상. → 다음: 게임리뷰 실수→퍼즐 연결, Lichess CC0 대량 퍼즐(데이터 필요)
+- **현재 마일스톤**: M1~M26 완료(main 통합) — Lichess 15.7k 퍼즐로 콘텐츠 구멍 해결. 다음 M27 SRS. → 다음: 게임리뷰 실수→퍼즐 연결, Lichess CC0 대량 퍼즐(데이터 필요)
 - **트렁크**: 스택 PR 7개를 main에 fast-forward 통합·정리(2026-07-17). 이후 작업은 main에서 분기. 열린 것은 Dependabot 9개(별도 검토).
 
 ## 제품 목표
@@ -114,6 +114,17 @@
       ③ **Pretendard 서체**(OFL, Checkmatey 실사용 글자만 서브셋 233KB) — 한글 완성도 격상
       ④ **디자인 시스템 컴포넌트**: GradientPrimaryButton(입체 그라데이션 CTA)·SectionCard·StatTile(컬러 배지)
       ⑤ **다크 창 테마**(values-night) + forceDark 차단 → 다크 흰 플래시 버그 예방 ⑥ 홈 리디자인 적용.
+
+## 방향 확정 (2026-07-18)
+- **타깃**: 초보~1400 "주머니 속 과외선생" (chess.com/Lichess에서 길 잃는 층 독점). 순수 Kotlin 엔진 유지.
+- **해자 3기둥**: 적응형 학습(진단·스킬트리·SRS) · 똑똑한 코치 · 콘텐츠+습관. 수익: 프리먼→Play Billing.
+- **로드맵**: M26 Lichess퍼즐 ✅ → M27 SRS → M28 진단/스킬트리 → M29 코치격상 → M30 성장대시보드 → 결제.
+- [x] **M26 — Lichess CC0 퍼즐 파이프라인(콘텐츠 구멍 해결)**: Lichess 퍼블릭도메인 DB(600만+)에서
+      초보용(레이팅 400~1500, 인기·플레이수 필터, 19개 테마 버킷 균등)으로 큐레이션 → **15,691문제**
+      온디바이스 애셋(1.5MB, `tools/puzzles/build_puzzles.py`, python-chess 전 수순 검증). 모델을
+      **다수 해답형**(해답 UCI 저장, 셋업수 사전적용)으로 진화 + `PuzzleRepository`(애셋 로더·적응 선택).
+      퍼즐 화면은 **수순을 이어 두고 상대 강제응수 자동재생**. 신규 테스트가 500개 수순을 Kotlin 엔진으로
+      재생해 python-chess와 규칙 일치 교차검증. `Position.findMove(uci)` 헬퍼 추가.
 
 ## 결정 로그 (Decision Log)
 

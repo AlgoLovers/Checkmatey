@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,24 +37,25 @@ import com.checkmatey.core.chess.Move
 import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.chess.toSan
-import com.checkmatey.core.engine.KotlinMinimaxEngine
-import com.checkmatey.core.puzzle.Puzzles
+import com.checkmatey.core.puzzle.PuzzleRepository
 import com.checkmatey.core.puzzle.Rating
 import com.checkmatey.data.UserStore
 import com.checkmatey.ui.board.ChessBoard
+import kotlinx.coroutines.delay
 
 private enum class PuzzleState { SOLVING, SOLVED, FAILED }
 
 /**
- * Puzzles tab: a rating-based tactics trainer. Each puzzle asks for the single best move; solving
- * raises your rating, missing lowers it, and the next puzzle is picked near your current level —
- * so difficulty adapts as you improve. Progress persists via [UserStore].
+ * Puzzles tab: a rating-based tactics trainer over the Lichess CC0 set. Each puzzle is a forced
+ * line — play the best move, the opponent's reply plays itself, keep going to the end. Solving
+ * raises your rating, missing lowers it, and the next puzzle is picked near your current level, so
+ * difficulty adapts as you improve. Progress persists via [UserStore].
  */
 @Composable
 fun PuzzlesScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val store = remember { UserStore(context) }
-    val engine = remember { KotlinMinimaxEngine() }
+    val repo = remember { PuzzleRepository(context) }
     val haptic = LocalHapticFeedback.current
 
     var rating by remember { mutableIntStateOf(store.puzzleRating) }
@@ -65,26 +67,64 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     var weakest by remember { mutableStateOf(store.weakestTheme()) }
     var focusWeakness by rememberSaveable { mutableStateOf(false) }
     // Themes the last game review flagged (review -> targeted practice).
-    var recommended by remember { mutableStateOf(store.recommendedThemes.firstOrNull { t -> Puzzles.ALL.any { it.theme == t } }) }
+    val themes = remember { repo.themes() }
+    var recommended by remember { mutableStateOf(store.recommendedThemes.firstOrNull { it in themes }) }
 
-    var puzzle by remember { mutableStateOf(Puzzles.next(store.puzzleRating, emptySet())) }
-    val solution = remember(puzzle) { engine.bestMove(puzzle.position, 4) }
+    var puzzle by remember { mutableStateOf(repo.next(store.puzzleRating, emptySet())) }
     var selected by remember { mutableStateOf<Square?>(null) }
     var state by remember { mutableStateOf(PuzzleState.SOLVING) }
-    // The board shows the puzzle position while solving; on solve/miss it plays the solution move.
+    // Multi-move solving: [step] is the index of the next expected solver move in solution (even
+    // indices are the player's moves; odd indices are the opponent's forced replies).
+    var step by remember(puzzle) { mutableIntStateOf(0) }
     var displayPos by remember(puzzle) { mutableStateOf(puzzle.position) }
-    var lastMove by remember { mutableStateOf<Move?>(null) }
+    var lastMove by remember(puzzle) { mutableStateOf<Move?>(null) }
+    var awaitingReply by remember(puzzle) { mutableStateOf(false) }
+    var failedSan by remember(puzzle) { mutableStateOf<String?>(null) }
 
-    val position = puzzle.position
-    val targets: Set<Square> = if (state == PuzzleState.SOLVING) {
-        selected?.let { from -> position.legalMoves().filter { it.from == from }.map { it.to }.toSet() } ?: emptySet()
+    val solverColor = puzzle.position.sideToMove
+    val canMove = state == PuzzleState.SOLVING && !awaitingReply && displayPos.sideToMove == solverColor
+    val targets: Set<Square> = if (canMove) {
+        selected?.let { from -> displayPos.legalMoves().filter { it.from == from }.map { it.to }.toSet() } ?: emptySet()
     } else {
         emptySet()
     }
 
+    // The opponent's forced reply plays itself after a short beat, then it's the player's turn again.
+    LaunchedEffect(awaitingReply, puzzle) {
+        if (awaitingReply) {
+            delay(450)
+            val reply = displayPos.findMove(puzzle.solution[step])
+            if (reply != null) {
+                displayPos = displayPos.applyMove(reply)
+                lastMove = reply
+                step += 1
+            }
+            awaitingReply = false
+        }
+    }
+
+    fun finish(solved: Boolean) {
+        store.recordTheme(puzzle.theme, solved)
+        rating = Rating.update(rating, puzzle.rating, solved)
+        store.puzzleRating = rating
+        store.pushRating(rating)
+        if (solved) {
+            solvedCount += 1; store.solvedCount = solvedCount
+            streak += 1; store.streak = streak
+            if (streak > bestStreak) { bestStreak = streak; store.bestStreak = bestStreak }
+            reviewIds = (reviewIds - puzzle.id).also { store.reviewIds = it } // solved -> off the review queue
+            state = PuzzleState.SOLVED
+        } else {
+            streak = 0; store.streak = 0
+            reviewIds = (reviewIds + puzzle.id).also { store.reviewIds = it } // missed -> review later
+            state = PuzzleState.FAILED
+        }
+        weakest = store.weakestTheme()
+    }
+
     fun loadNext() {
         solvedIds = solvedIds + puzzle.id
-        puzzle = Puzzles.next(
+        puzzle = repo.next(
             rating = rating,
             solved = solvedIds,
             reviewIds = reviewIds,
@@ -95,55 +135,37 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             },
         )
         selected = null
-        lastMove = null
         state = PuzzleState.SOLVING
     }
 
     fun onSquareClick(square: Square) {
-        if (state != PuzzleState.SOLVING) return
+        if (!canMove) return
         val current = selected
         if (current == null) {
-            if (position.pieceAt(square)?.color == position.sideToMove) selected = square
+            if (displayPos.pieceAt(square)?.color == solverColor) selected = square
             return
         }
-        if (square == current) {
-            selected = null
-            return
-        }
-        val move = position.legalMoves().firstOrNull { it.from == current && it.to == square }
+        if (square == current) { selected = null; return }
+        val move = displayPos.legalMoves().firstOrNull { it.from == current && it.to == square }
         if (move == null) {
-            selected = if (position.pieceAt(square)?.color == position.sideToMove) square else null
+            selected = if (displayPos.pieceAt(square)?.color == solverColor) square else null
             return
         }
         selected = null
+        val expected = displayPos.findMove(puzzle.solution[step]) ?: return
+        val correct = move.from == expected.from && move.to == expected.to
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        val correct = solution != null && move.from == solution.from && move.to == solution.to
-        store.recordTheme(puzzle.theme, correct)
         if (correct) {
-            rating = Rating.update(rating, puzzle.rating, true)
-            store.puzzleRating = rating
-            solvedCount += 1
-            store.solvedCount = solvedCount
-            streak += 1
-            store.streak = streak
-            if (streak > bestStreak) {
-                bestStreak = streak
-                store.bestStreak = bestStreak
-            }
-            reviewIds = (reviewIds - puzzle.id).also { store.reviewIds = it } // solved -> off the review queue
-            state = PuzzleState.SOLVED
+            displayPos = displayPos.applyMove(expected)
+            lastMove = expected
+            step += 1
+            if (step >= puzzle.solution.size) finish(solved = true) else awaitingReply = true
         } else {
-            rating = Rating.update(rating, puzzle.rating, false)
-            store.puzzleRating = rating
-            streak = 0
-            store.streak = 0
-            reviewIds = (reviewIds + puzzle.id).also { store.reviewIds = it } // missed -> review later
-            state = PuzzleState.FAILED
+            failedSan = displayPos.toSan(expected)
+            displayPos = displayPos.applyMove(expected)
+            lastMove = expected
+            finish(solved = false)
         }
-        // Play the solution move on the board (animated) so the right move is always shown.
-        solution?.let { displayPos = puzzle.position.applyMove(it); lastMove = it }
-        store.pushRating(rating)
-        weakest = store.weakestTheme()
     }
 
     Column(
@@ -181,8 +203,9 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             state = state,
             theme = puzzle.theme,
             puzzleRating = puzzle.rating,
-            sideToMove = position.sideToMove,
-            solutionSan = solution?.let { position.toSan(it) },
+            sideToMove = solverColor,
+            movesLeft = (puzzle.solution.size - step + 1) / 2,
+            failedSan = failedSan,
         )
         Spacer(Modifier.height(10.dp))
 
@@ -195,7 +218,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
                     selected = selected,
                     targets = targets,
                     lastMove = lastMove,
-                    onSquareClick = if (state == PuzzleState.SOLVING) ::onSquareClick else null,
+                    onSquareClick = if (canMove) ::onSquareClick else null,
                 )
             }
         }
@@ -205,7 +228,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             Button(onClick = ::loadNext) { Text("다음 문제 →") }
         } else {
             Text(
-                "기물을 탭해 최선의 수를 두세요",
+                if (step == 0) "기물을 탭해 최선의 수를 두세요" else "좋아요 — 수순을 계속 이어가세요",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -271,18 +294,20 @@ private fun StatusCard(
     theme: String,
     puzzleRating: Int,
     sideToMove: PieceColor,
-    solutionSan: String?,
+    movesLeft: Int,
+    failedSan: String?,
 ) {
     val scheme = MaterialTheme.colorScheme
     val side = if (sideToMove == PieceColor.WHITE) "백" else "흑"
+    val moveHint = if (movesLeft > 1) " · ${movesLeft}수 수순" else ""
     val (container, onContainer, text) = when (state) {
         PuzzleState.SOLVING -> Triple(
             scheme.surfaceVariant,
             scheme.onSurfaceVariant,
-            "$theme · $puzzleRating\n$side 차례 — 최선의 수를 찾으세요",
+            "$theme · $puzzleRating$moveHint\n$side 차례 — 최선의 수를 찾으세요",
         )
         PuzzleState.SOLVED -> Triple(scheme.tertiaryContainer, scheme.onTertiaryContainer, "정답입니다! ✓")
-        PuzzleState.FAILED -> Triple(scheme.errorContainer, scheme.onErrorContainer, "아쉬워요. 정답은 ${solutionSan ?: "?"} 였습니다")
+        PuzzleState.FAILED -> Triple(scheme.errorContainer, scheme.onErrorContainer, "아쉬워요. 정답은 ${failedSan ?: "?"} 였습니다")
     }
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = container, contentColor = onContainer) {
         Text(

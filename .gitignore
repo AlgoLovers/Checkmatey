@@ -45,3 +45,7 @@ loop-run-log.md
 # Font subsetting: generated charset + large upstream source (re-fetch when re-subsetting)
 tools/fonts/_charset.txt
 **/PretendardVariable.ttf
+
+# Puzzle pipeline: large upstream Lichess DB (re-download when re-curating); keep the curated asset
+**/lichess_db_puzzle.csv*
+tools/puzzles/*.zst

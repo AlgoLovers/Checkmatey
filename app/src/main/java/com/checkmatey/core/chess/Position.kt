@@ -57,6 +57,13 @@ class Position(
     fun pieceAt(square: Square): Piece? = squares[square.index]
     fun pieceAt(file: Int, rank: Int): Piece? = squares[rank * 8 + file]
 
+    /**
+     * The legal move matching a UCI string (e.g. "e2e4", "e7e8q", "e1g1" castling), or null if
+     * none is legal here. Matching against [legalMoves] means the returned move carries the right
+     * castle / en-passant / promotion flags — the caller doesn't reconstruct them.
+     */
+    fun findMove(uci: String): Move? = legalMoves().firstOrNull { it.uci() == uci }
+
     // ---- Move generation ------------------------------------------------------------
 
     /** All fully legal moves for [sideToMove]. */
