@@ -37,6 +37,7 @@ import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.engine.Annotator
+import com.checkmatey.core.engine.BotLevel
 import com.checkmatey.core.engine.GameReviewer
 import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.core.engine.MoveAnnotation
@@ -46,6 +47,7 @@ import com.checkmatey.ui.board.ChessBoard
 import com.checkmatey.ui.board.BoardArrow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 import kotlinx.coroutines.withContext
 
 /**
@@ -105,82 +107,124 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
 
         val annotation = if (ply > 0) done.getOrNull(ply - 1) else null
 
-        // ---- Retry mode: replay this moment yourself and get graded instantly. ----
+        // ---- Retry mode: replay this moment yourself and PLAY IT OUT against the engine. ----
+        // You take the side that was to move here; the computer answers your moves, so you can see
+        // how the game would have gone if you'd chosen differently. The first move is coached.
         var retryMode by remember { mutableStateOf(false) }
+        var retryPos by remember { mutableStateOf<Position?>(null) }
         var retrySelected by remember { mutableStateOf<Square?>(null) }
-        var retryDisplay by remember { mutableStateOf<Position?>(null) }
         var retryLast by remember { mutableStateOf<Move?>(null) }
         var retryFeedback by remember { mutableStateOf<MoveAnnotation?>(null) }
+        var retryFirstDone by remember { mutableStateOf(false) }
+        var retryPlayerColor by remember { mutableStateOf(mySide) }
         val scope = rememberCoroutineScope()
+        val retryEngine = remember { KotlinMinimaxEngine() }
+
+        fun startRetry() {
+            val base = game.positionAt(ply - 1)
+            retryPos = base
+            retryPlayerColor = base.sideToMove
+            retrySelected = null
+            retryLast = null
+            retryFeedback = null
+            retryFirstDone = false
+            retryMode = true
+        }
 
         fun exitRetry() {
             retryMode = false
+            retryPos = null
             retrySelected = null
-            retryDisplay = null
             retryLast = null
             retryFeedback = null
+            retryFirstDone = false
         }
 
         if (retryMode && ply > 0) {
-            val basePos = game.positionAt(ply - 1)
-            val fb = retryFeedback
+            val pos = retryPos ?: game.positionAt(ply - 1)
+            val over = pos.isGameOver()
+            val myTurn = pos.sideToMove == retryPlayerColor && !over
             val scheme = MaterialTheme.colorScheme
+
+            // The engine answers whenever it's not the player's turn — this is what makes it a game.
+            LaunchedEffect(retryPos) {
+                val p = retryPos
+                if (retryMode && p != null && !p.isGameOver() && p.sideToMove != retryPlayerColor) {
+                    val mv = withContext(Dispatchers.Default) {
+                        retryEngine.chooseMove(p, BotLevel.forRating(store.puzzleRating), Random.Default)
+                    }
+                    if (mv != null && retryMode) { retryLast = mv; retryPos = p.applyMove(mv) }
+                }
+            }
+
+            val fb = retryFeedback
             val (cardText, container, onContainer) = when {
-                fb == null -> Triple("🔁 이 국면에서 직접 두어 보세요 — 코치가 바로 채점합니다", scheme.primaryContainer, scheme.onPrimaryContainer)
+                over -> Triple(retryOutcome(pos, retryPlayerColor), scheme.primaryContainer, scheme.onPrimaryContainer)
+                fb == null -> Triple("🔁 이 국면부터 직접 둬보세요 — 컴퓨터가 응수합니다. 첫 수는 코치가 채점해요", scheme.primaryContainer, scheme.onPrimaryContainer)
                 fb.quality.ordinal <= MoveQuality.GOOD.ordinal ->
-                    Triple("${fb.san}  ${fb.quality.label} ${fb.quality.symbol} — ${fb.reason}", scheme.tertiaryContainer, scheme.onTertiaryContainer)
+                    Triple("첫 수 ${fb.san}  ${fb.quality.label} ${fb.quality.symbol} — ${fb.reason}", scheme.tertiaryContainer, scheme.onTertiaryContainer)
                 else ->
-                    Triple("${fb.san}  ${fb.quality.label} ${fb.quality.symbol}\n${fb.reason}", scheme.errorContainer, scheme.onErrorContainer)
+                    Triple("첫 수 ${fb.san}  ${fb.quality.label} ${fb.quality.symbol}\n${fb.reason}", scheme.errorContainer, scheme.onErrorContainer)
             }
             Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = container, contentColor = onContainer) {
                 Text(cardText, Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(10.dp))
 
-            val shown = retryDisplay ?: basePos
-            val targets: Set<Square> = if (retryDisplay == null) {
-                retrySelected?.let { from -> basePos.legalMoves().filter { it.from == from }.map { it.to }.toSet() } ?: emptySet()
+            val targets: Set<Square> = if (myTurn) {
+                retrySelected?.let { from -> pos.legalMoves().filter { it.from == from }.map { it.to }.toSet() } ?: emptySet()
             } else emptySet()
 
             fun onRetryClick(square: Square) {
-                if (retryDisplay != null) return
+                if (!myTurn) return
                 val current = retrySelected
                 if (current == null) {
-                    if (basePos.pieceAt(square)?.color == basePos.sideToMove) retrySelected = square
+                    if (pos.pieceAt(square)?.color == retryPlayerColor) retrySelected = square
                     return
                 }
                 if (square == current) { retrySelected = null; return }
-                val candidates = basePos.legalMoves().filter { it.from == current && it.to == square }
+                val candidates = pos.legalMoves().filter { it.from == current && it.to == square }
                 val move = candidates.firstOrNull { it.promotion == null } ?: candidates.firstOrNull()
                 if (move == null) {
-                    retrySelected = if (basePos.pieceAt(square)?.color == basePos.sideToMove) square else null
+                    retrySelected = if (pos.pieceAt(square)?.color == retryPlayerColor) square else null
                     return
                 }
                 retrySelected = null
-                retryDisplay = basePos.applyMove(move)
+                if (!retryFirstDone) {
+                    val base = pos
+                    scope.launch { retryFeedback = withContext(Dispatchers.Default) { annotator.annotate(base, move) } }
+                    retryFirstDone = true
+                }
                 retryLast = move
-                scope.launch { retryFeedback = withContext(Dispatchers.Default) { annotator.annotate(basePos, move) } }
+                retryPos = pos.applyMove(move)
             }
 
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 BoxWithConstraints {
                     val side = minOf(maxWidth, maxHeight).coerceAtMost(480.dp)
                     ChessBoard(
-                        position = shown,
+                        position = pos,
                         modifier = Modifier.size(side),
                         selected = retrySelected,
                         targets = targets,
                         lastMove = retryLast,
-                        onSquareClick = if (retryDisplay == null) ::onRetryClick else null,
+                        onSquareClick = if (myTurn) ::onRetryClick else null,
                     )
                 }
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(
+                when {
+                    over -> "대국 종료 — [처음부터 다시]로 다른 수를 시도해 보세요"
+                    myTurn -> "내 차례 — 두어 보세요"
+                    else -> "컴퓨터가 생각하는 중…"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { retrySelected = null; retryDisplay = null; retryLast = null; retryFeedback = null },
-                    enabled = retryDisplay != null,
-                ) { Text("다른 수 시도") }
+                OutlinedButton(onClick = ::startRetry) { Text("처음부터 다시") }
                 OutlinedButton(onClick = ::exitRetry) { Text("복기로 돌아가기") }
             }
             return@Column
@@ -256,9 +300,16 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
         }
         if (ply > 0) {
             Spacer(Modifier.height(6.dp))
-            OutlinedButton(onClick = { autoplay = false; retryMode = true }) { Text("🔁 이 수 다시 둬보기") }
+            OutlinedButton(onClick = { autoplay = false; startRetry() }) { Text("🔁 여기서부터 직접 둬보기") }
         }
     }
+}
+
+/** Outcome text when a play-it-out branch ends, from the retrying player's point of view. */
+private fun retryOutcome(pos: com.checkmatey.core.chess.Position, playerColor: PieceColor): String = when {
+    pos.isCheckmate() && pos.sideToMove != playerColor -> "🎉 체크메이트 — 이겼어요! 이 수순이 더 좋았네요"
+    pos.isCheckmate() -> "체크메이트로 졌어요 — 다른 수순을 시도해 보세요"
+    else -> "무승부입니다"
 }
 
 @Composable
