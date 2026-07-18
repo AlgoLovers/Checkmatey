@@ -36,7 +36,7 @@ data class MoveAnnotation(
  * and positional plans — free captures, forks, pins, discovered checks, threats on undefended
  * pieces, checkmate, castling, promotion, and (failing all that) the developing/centre/rook idea.
  */
-class Annotator(private val engine: Engine, private val depth: Int = 3) {
+class Annotator(private val engine: Engine, private val depth: Int = 4) {
 
     /** The best move for [position], with an explanation — i.e. a hint. */
     fun hint(position: Position): MoveAnnotation? {
@@ -47,17 +47,23 @@ class Annotator(private val engine: Engine, private val depth: Int = 3) {
 
     /** Judge a move actually played from [before] against the engine's best. */
     fun annotate(before: Position, move: Move): MoveAnnotation {
-        val best = engine.bestMove(before, depth)
-        val moveValue = engine.evaluateMove(before, move, depth)
-        val bestValue = if (best != null) engine.evaluateMove(before, best, depth) else moveValue
-        val loss = (bestValue - moveValue).coerceAtLeast(0)
+        val bestScored = engine.bestMoveWithScore(before, depth)
+        val best = bestScored?.first
         val isBest = best != null && move.from == best.from && move.to == best.to && move.promotion == best.promotion
+        // The root search already scored the best move — only the played move needs a search.
+        val bestValue = bestScored?.second ?: 0
+        val moveValue = if (isBest) bestValue else engine.evaluateMove(before, move, depth)
+        val loss = (bestValue - moveValue).coerceIn(0, 1500)
 
+        // Grade on WIN-PROBABILITY drop, not raw centipawns: mate scores saturate instead of
+        // exploding (winning slower than mate-in-N is no longer a "blunder"), and the same cp loss
+        // matters less in a decided position than in a level one — kinder, truer coaching.
+        val drop = winPct(bestValue) - winPct(moveValue)
         val quality = when {
-            isBest || loss <= 15 -> MoveQuality.BEST
-            loss <= 60 -> MoveQuality.GOOD
-            loss <= 130 -> MoveQuality.INACCURACY
-            loss <= 280 -> MoveQuality.MISTAKE
+            isBest || drop < 3 -> MoveQuality.BEST
+            drop < 8 -> MoveQuality.GOOD
+            drop < 15 -> MoveQuality.INACCURACY
+            drop < 25 -> MoveQuality.MISTAKE
             else -> MoveQuality.BLUNDER
         }
 
@@ -120,6 +126,12 @@ class Annotator(private val engine: Engine, private val depth: Int = 3) {
     }
 
     /** Number of non-pawn enemy pieces the piece now on [from] attacks. */
+    /** Win probability (0–100) for the side to move, from a centipawn score — Lichess's mapping. */
+    private fun winPct(cp: Int): Double {
+        val c = cp.coerceIn(-1500, 1500)
+        return 100.0 / (1.0 + kotlin.math.exp(-0.00368208 * c))
+    }
+
     private fun forkCount(pos: Position, from: Square): Int {
         val piece = pos.pieceAt(from) ?: return 0
         val enemy = piece.color.opposite()

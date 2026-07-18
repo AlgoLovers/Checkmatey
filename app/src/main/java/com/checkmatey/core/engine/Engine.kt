@@ -13,6 +13,13 @@ interface Engine {
     fun bestMove(position: Position, depth: Int): Move?
 
     /**
+     * [bestMove] plus its search score (side-to-move perspective). Implementations that already
+     * know the root score should override this so callers don't pay for a second search.
+     */
+    fun bestMoveWithScore(position: Position, depth: Int): Pair<Move, Int>? =
+        bestMove(position, depth)?.let { it to evaluateMove(position, it, depth) }
+
+    /**
      * Search value of playing [move] from [before], in centipawns from the moving side's
      * perspective (higher = better). Used to score/compare moves for coaching feedback.
      */
