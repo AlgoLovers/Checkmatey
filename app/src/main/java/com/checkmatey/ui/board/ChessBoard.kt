@@ -67,6 +67,8 @@ fun ChessBoard(
     lastMove: Move? = null,
     hintSquares: Set<Square> = emptySet(),
     arrows: List<BoardArrow> = emptyList(),
+    // (square, counter) — a capture "pop" plays at the square whenever the pair changes.
+    captureEffect: Pair<Square, Int>? = null,
     onSquareClick: ((Square) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier.aspectRatio(1f)) {
@@ -154,6 +156,35 @@ fun ChessBoard(
                     contentAlignment = Alignment.Center,
                 ) {
                     PieceGlyph(moving, glyphSize)
+                }
+            }
+        }
+
+        // Capture pop: an expanding golden ring at the capture square — a small, satisfying "got it!".
+        if (captureEffect != null) {
+            val pop = remember(captureEffect) { Animatable(0f) }
+            LaunchedEffect(captureEffect) { pop.animateTo(1f, tween(durationMillis = 380)) }
+            val p = pop.value
+            if (p < 1f) {
+                val cellPx = with(LocalDensity.current) { cell.toPx() }
+                Canvas(Modifier.matchParentSize()) {
+                    val sq = captureEffect.first
+                    val center = Offset(
+                        x = (sq.file + 0.5f) * cellPx,
+                        y = (7 - sq.rank + 0.5f) * cellPx,
+                    )
+                    val alpha = 1f - p
+                    drawCircle(
+                        color = Color(0xFFFFC46A).copy(alpha = alpha * 0.85f),
+                        radius = cellPx * (0.15f + 0.55f * p),
+                        center = center,
+                        style = Stroke(width = cellPx * 0.10f * (1f - 0.6f * p)),
+                    )
+                    drawCircle(
+                        color = Color(0xFFFFF3DC).copy(alpha = alpha * 0.5f),
+                        radius = cellPx * 0.30f * (1f - p),
+                        center = center,
+                    )
                 }
             }
         }

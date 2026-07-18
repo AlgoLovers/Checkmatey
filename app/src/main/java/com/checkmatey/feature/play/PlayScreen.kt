@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.checkmatey.core.chess.Move
+import com.checkmatey.core.chess.Material
 import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.PieceType
 import com.checkmatey.core.chess.Position
@@ -60,6 +61,7 @@ import com.checkmatey.feature.review.ReviewScreen
 import com.checkmatey.sound.Sfx
 import com.checkmatey.sound.SoundFx
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.components.EvalBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -104,6 +106,9 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     var threats by remember { mutableStateOf<List<Threat>>(emptyList()) }
     var recall by remember { mutableStateOf<String?>(null) }
     var promotionChoice by remember { mutableStateOf<List<Move>>(emptyList()) }
+    // Capture pop effect target: (square, counter) so consecutive captures on one square re-fire.
+    var captureFx by remember { mutableStateOf<Pair<Square, Int>?>(null) }
+    var showCaptured by remember { mutableStateOf(false) }
     val moves = remember { mutableStateListOf<Move>() }
     // Position after every ply (starts with the current position) — powers undo and
     // threefold-repetition detection.
@@ -147,6 +152,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         moves.add(move)
         history.add(position)
         lastMove = move
+        if (capture) captureFx = move.to to ((captureFx?.second ?: 0) + 1)
         hint = null
         hintStage = 0
         hintLadder = emptyList()
@@ -308,6 +314,47 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(8.dp))
 
+        // Advantage gauge (full evaluation: material + positioning) + captured pieces, tap for detail.
+        val evalCp = remember(position) { engine.evaluate(position) }
+        val captured = remember(position) { Material.captured(position) }
+        EvalBar(evalCp = evalCp)
+        if (captured.byWhite.isNotEmpty() || captured.byBlack.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Surface(
+                onClick = { showCaptured = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "나: ${captured.byWhite.joinToString("") { Material.glyph(it) }.ifEmpty { "—" }}",
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                    Text(
+                        when {
+                            captured.diffPawns > 0 -> "+${captured.diffPawns}"
+                            captured.diffPawns < 0 -> "${captured.diffPawns}"
+                            else -> "="
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        "봇: ${captured.byBlack.joinToString("") { Material.glyph(it) }.ifEmpty { "—" }}",
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             BoxWithConstraints {
                 val side = minOf(maxWidth, maxHeight).coerceAtMost(520.dp)
@@ -319,6 +366,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
                     lastMove = lastMove,
                     hintSquares = hintSquares,
                     onSquareClick = ::onSquareClick,
+                    captureEffect = captureFx,
                 )
             }
         }
@@ -377,6 +425,39 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             }
             store.saveGame(result, moves.map { it.uci() })
         }
+    }
+
+    if (showCaptured) {
+        val captured = Material.captured(position)
+        AlertDialog(
+            onDismissRequest = { showCaptured = false },
+            title = { Text("잡은 기물") },
+            text = {
+                Column {
+                    Text("내가 잡은 기물", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        captured.byWhite.joinToString(" ") { Material.glyph(it) }.ifEmpty { "아직 없음" },
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("봇이 잡은 기물", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        captured.byBlack.joinToString(" ") { Material.glyph(it) }.ifEmpty { "아직 없음" },
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        when {
+                            captured.diffPawns > 0 -> "기물 점수로 내가 폰 ${captured.diffPawns}점만큼 앞서 있어요."
+                            captured.diffPawns < 0 -> "기물 점수로 봇이 폰 ${-captured.diffPawns}점만큼 앞서 있어요."
+                            else -> "기물 점수는 동등해요."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { showCaptured = false }) { Text("닫기") } },
+        )
     }
 
     if (promotionChoice.isNotEmpty()) {
