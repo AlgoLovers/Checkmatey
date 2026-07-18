@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import com.checkmatey.core.plan.StepTarget
 import com.checkmatey.data.UserStore
+import com.checkmatey.feature.dashboard.GrowthDashboardScreen
 import com.checkmatey.feature.diagnostic.PlacementScreen
 import com.checkmatey.feature.home.HomeScreen
 import com.checkmatey.feature.skilltree.SkillTreeScreen
@@ -79,6 +80,13 @@ fun CheckmateyApp() {
         return
     }
 
+    // Full-screen growth dashboard overlay, launched from the home card.
+    var showDashboard by rememberSaveable { mutableStateOf(false) }
+    if (showDashboard) {
+        GrowthDashboardScreen(onBack = { showDashboard = false })
+        return
+    }
+
     var selectedIndex by rememberSaveable { mutableIntStateOf(TopDestination.HOME.ordinal) }
     val current = TopDestination.entries[selectedIndex]
 
@@ -115,6 +123,7 @@ fun CheckmateyApp() {
                     onGo = ::goTo,
                     onPlacement = { showPlacement = true },
                     onSkillTree = { showSkillTree = true },
+                    onDashboard = { showDashboard = true },
                 )
                 TopDestination.LESSONS -> LessonScreen()
                 TopDestination.LEARN -> StudyScreen()

@@ -42,6 +42,7 @@ fun HomeScreen(
     onGo: (StepTarget) -> Unit,
     onPlacement: () -> Unit,
     onSkillTree: () -> Unit,
+    onDashboard: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -202,6 +203,31 @@ fun HomeScreen(
                     Text("규칙 → 전술 → 실전, 전체 진행 $treePercent%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text("지도 →", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Growth report — the "how far have I come?" view that keeps players (and subscribers) coming back.
+        val trend = store.ratingHistory.let { if (it.size >= 2) it.last() - it.first() else 0 }
+        Surface(
+            onClick = onDashboard,
+            Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("📈", style = MaterialTheme.typography.headlineSmall)
+                Column(Modifier.weight(1f)) {
+                    Text("나의 성장 리포트", style = MaterialTheme.typography.titleSmall)
+                    val sub = if (trend > 0) "시작보다 ▲ +$trend · 전술별 강약점 한눈에" else "레이팅 추이 · 전술별 강약점 한눈에"
+                    Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("리포트 →", style = MaterialTheme.typography.labelLarge)
             }
         }
 
