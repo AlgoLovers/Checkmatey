@@ -13,15 +13,23 @@ data class Progress(
     val gamesPlayed: Int,
     val hasWeakThemeToDrill: Boolean,
     val unreviewedGame: Boolean,
+    val dueReviews: Int = 0,
 )
 
 /**
  * Picks the single most useful next action, so the home screen can say "do this now" instead of
  * dropping the user in front of five tabs. The order encodes a beginner-friendly learning path:
- * learn the rules first, then reinforce with tactics, then play, then review, then drill weaknesses.
+ * clear time-sensitive spaced reviews first, then learn the rules, reinforce with tactics, play,
+ * review games, and drill weaknesses.
  */
 object Planner {
     fun next(p: Progress): NextStep = when {
+        p.dueReviews > 0 -> NextStep(
+            "복습할 시간 (${p.dueReviews})",
+            "예전에 틀린 전술을 다시 풀어 기억에 새깁니다 — 간격 반복이 실력을 굳혀요",
+            "복습 시작",
+            StepTarget.PUZZLE,
+        )
         p.lessonsDone < p.lessonsTotal -> NextStep(
             "레슨 이어서 배우기",
             "기초부터 순서대로 — ${p.lessonsDone}/${p.lessonsTotal} 완료",

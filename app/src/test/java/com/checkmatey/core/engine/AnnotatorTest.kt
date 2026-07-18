@@ -55,4 +55,33 @@ class AnnotatorTest {
         val annotation = annotator.annotate(pos, nc7)
         assertTrue("reason should mention a fork: ${annotation.reason}", annotation.reason.contains("포크"))
     }
+
+    @Test
+    fun callsOutAFreeCapture() {
+        // The rook grabs an undefended queen — the coach should say it's free.
+        val pos = Position.fromFen("4k3/8/8/8/3q4/8/8/3RK3 w - - 0 1")
+        val rxd4 = pos.legalMoves().first { it.from == Square.fromName("d1") && it.to == Square.fromName("d4") }
+        val annotation = annotator.annotate(pos, rxd4)
+        assertTrue("reason should say the capture is free: ${annotation.reason}", annotation.reason.contains("공짜"))
+    }
+
+    @Test
+    fun explainsAPin() {
+        // Bishop f1xb5 grabs a free pawn AND pins the c6 knight to the king on e8 (b5-c6-d7-e8).
+        val pos = Position.fromFen("4k3/8/2n5/1p6/8/8/8/4KB2 w - - 0 1")
+        val bxb5 = pos.legalMoves().first { it.from == Square.fromName("f1") && it.to == Square.fromName("b5") }
+        val annotation = annotator.annotate(pos, bxb5)
+        assertEquals(MoveQuality.BEST, annotation.quality)
+        assertTrue("reason should mention a pin: ${annotation.reason}", annotation.reason.contains("핀"))
+    }
+
+    @Test
+    fun explainsADiscoveredCheck() {
+        // Knight d4xf5 wins the queen and the rook on d1 uncovers a check on the king at d8
+        // (the knight itself doesn't attack d8, so it's a *discovered* check).
+        val pos = Position.fromFen("3k4/8/8/5q2/3N4/8/8/3RK3 w - - 0 1")
+        val nxf5 = pos.legalMoves().first { it.from == Square.fromName("d4") && it.to == Square.fromName("f5") }
+        val annotation = annotator.annotate(pos, nxf5)
+        assertTrue("reason should mention a discovered check: ${annotation.reason}", annotation.reason.contains("디스커버드"))
+    }
 }

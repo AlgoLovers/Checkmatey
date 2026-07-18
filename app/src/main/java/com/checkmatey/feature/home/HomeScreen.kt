@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import com.checkmatey.core.plan.Planner
 import com.checkmatey.core.plan.Progress
 import com.checkmatey.core.plan.StepTarget
+import com.checkmatey.core.skilltree.SkillProgress
+import com.checkmatey.core.skilltree.SkillTree
 import com.checkmatey.data.UserStore
 import com.checkmatey.ui.Sparkline
 import com.checkmatey.ui.components.GradientPrimaryButton
@@ -36,11 +38,17 @@ import com.checkmatey.ui.theme.Info
  * plus a small progress view, instead of dropping a beginner in front of five tabs.
  */
 @Composable
-fun HomeScreen(onGo: (StepTarget) -> Unit, modifier: Modifier = Modifier) {
+fun HomeScreen(
+    onGo: (StepTarget) -> Unit,
+    onPlacement: () -> Unit,
+    onSkillTree: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val store = remember { UserStore(context) }
 
     val games = store.recentGames
+    val today = remember { System.currentTimeMillis() / 86_400_000L }
     val progress = Progress(
         lessonsDone = store.completedLessons.size,
         lessonsTotal = 12,
@@ -48,6 +56,7 @@ fun HomeScreen(onGo: (StepTarget) -> Unit, modifier: Modifier = Modifier) {
         gamesPlayed = games.size,
         hasWeakThemeToDrill = store.recommendedThemes.isNotEmpty(),
         unreviewedGame = games.isNotEmpty() && !store.reviewedLatestGame,
+        dueReviews = store.dueReviewCount(today),
     )
     val step = Planner.next(progress)
 
@@ -77,6 +86,34 @@ fun HomeScreen(onGo: (StepTarget) -> Unit, modifier: Modifier = Modifier) {
                 Spacer(Modifier.height(18.dp))
                 GradientPrimaryButton(onClick = { onGo(step.target) }, modifier = Modifier.fillMaxWidth()) {
                     Text(step.cta, style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+
+        // One-time invite: place the player at the right level if they already know chess.
+        if (!store.placementDone) {
+            Spacer(Modifier.height(12.dp))
+            Surface(
+                onClick = onPlacement,
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("🎯", style = MaterialTheme.typography.headlineSmall)
+                    Column(Modifier.weight(1f)) {
+                        Text("실력 진단으로 시작점 찾기", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "체스를 둘 줄 안다면 7문제로 딱 맞는 난이도부터 — 처음이라면 건너뛰어도 돼요",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Text("진단 →", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
@@ -134,6 +171,37 @@ fun HomeScreen(onGo: (StepTarget) -> Unit, modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Learning map — a tap into the full journey view.
+        val treePercent = SkillTree.progressPercent(
+            SkillProgress(
+                completedLessons = store.completedLessons,
+                puzzlesSolved = progress.puzzlesSolved,
+                gamesPlayed = games.size,
+                completedDrills = store.completedDrills,
+            ),
+        )
+        Surface(
+            onClick = onSkillTree,
+            Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("🗺️", style = MaterialTheme.typography.headlineSmall)
+                Column(Modifier.weight(1f)) {
+                    Text("나의 학습 지도", style = MaterialTheme.typography.titleSmall)
+                    Text("규칙 → 전술 → 실전, 전체 진행 $treePercent%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("지도 →", style = MaterialTheme.typography.labelLarge)
             }
         }
 

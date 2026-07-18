@@ -40,8 +40,9 @@ class GameReviewer(private val annotator: Annotator) {
             val reason = a.reason
             when {
                 "포크" in reason -> themes += "포크"
+                "핀" in reason -> themes += "핀"
                 "체크메이트" in reason -> themes += "백랭크 메이트"
-                "잡아" in reason || "이득" in reason -> themes += "기물 이득"
+                "잡" in reason || "이득" in reason -> themes += "기물 이득"
             }
         }
         return themes.toList()

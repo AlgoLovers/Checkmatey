@@ -29,7 +29,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import com.checkmatey.core.plan.StepTarget
 import com.checkmatey.data.UserStore
+import com.checkmatey.feature.diagnostic.PlacementScreen
 import com.checkmatey.feature.home.HomeScreen
+import com.checkmatey.feature.skilltree.SkillTreeScreen
 import com.checkmatey.feature.lesson.LessonScreen
 import com.checkmatey.feature.onboarding.OnboardingScreen
 import com.checkmatey.feature.play.PlayScreen
@@ -60,6 +62,20 @@ fun CheckmateyApp() {
     var onboarded by rememberSaveable { mutableStateOf(store.onboardingSeen) }
     if (!onboarded) {
         OnboardingScreen(onDone = { store.onboardingSeen = true; onboarded = true })
+        return
+    }
+
+    // Full-screen diagnostic placement overlay, launched from the home invite.
+    var showPlacement by rememberSaveable { mutableStateOf(false) }
+    if (showPlacement) {
+        PlacementScreen(onDone = { showPlacement = false })
+        return
+    }
+
+    // Full-screen learning-map overlay, launched from the home card.
+    var showSkillTree by rememberSaveable { mutableStateOf(false) }
+    if (showSkillTree) {
+        SkillTreeScreen(onBack = { showSkillTree = false })
         return
     }
 
@@ -95,7 +111,11 @@ fun CheckmateyApp() {
             },
         ) {
             when (current) {
-                TopDestination.HOME -> HomeScreen(onGo = ::goTo)
+                TopDestination.HOME -> HomeScreen(
+                    onGo = ::goTo,
+                    onPlacement = { showPlacement = true },
+                    onSkillTree = { showSkillTree = true },
+                )
                 TopDestination.LESSONS -> LessonScreen()
                 TopDestination.LEARN -> StudyScreen()
                 TopDestination.PLAY -> PlayScreen()

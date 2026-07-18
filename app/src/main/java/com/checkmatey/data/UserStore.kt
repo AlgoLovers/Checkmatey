@@ -2,6 +2,9 @@ package com.checkmatey.data
 
 import android.content.Context
 import com.checkmatey.core.puzzle.Rating
+import com.checkmatey.core.srs.Grade
+import com.checkmatey.core.srs.Srs
+import com.checkmatey.core.srs.SrsCard
 import org.json.JSONObject
 
 /**
@@ -34,6 +37,11 @@ class UserStore(context: Context) {
     var onboardingSeen: Boolean
         get() = prefs.getBoolean(KEY_ONBOARDED, false)
         set(value) = prefs.edit().putBoolean(KEY_ONBOARDED, value).apply()
+
+    /** Whether the user has taken (or dismissed) the diagnostic placement quiz. */
+    var placementDone: Boolean
+        get() = prefs.getBoolean(KEY_PLACED, false)
+        set(value) = prefs.edit().putBoolean(KEY_PLACED, value).apply()
 
     /**
      * Recent finished games, newest first, as "result|uci,uci,...". Kept small (10) — this is a
@@ -69,10 +77,27 @@ class UserStore(context: Context) {
         get() = prefs.getString(KEY_REC_THEMES, "").orEmpty().split(",").filter { it.isNotBlank() }
         set(value) = prefs.edit().putString(KEY_REC_THEMES, value.joinToString(",")).apply()
 
-    /** Ids of previously-missed puzzles, queued for spaced-repetition review. */
-    var reviewIds: List<String>
-        get() = prefs.getString(KEY_REVIEW, "").orEmpty().split(",").filter { it.isNotBlank() }
-        set(value) = prefs.edit().putString(KEY_REVIEW, value.distinct().joinToString(",")).apply()
+    /**
+     * Spaced-repetition deck: puzzles the user has missed, each carrying its SM-2 schedule (see
+     * [Srs]). Stored compactly as `;`-joined encoded cards. Bounded to the most recent 500 so the
+     * prefs blob stays small — a beginner's weak-spot deck is far smaller than that in practice.
+     */
+    var srsCards: List<SrsCard>
+        get() = prefs.getString(KEY_SRS, "").orEmpty().split(";").filter { it.isNotBlank() }.mapNotNull { SrsCard.decode(it) }
+        set(value) = prefs.edit().putString(KEY_SRS, value.takeLast(500).joinToString(";") { it.encode() }).apply()
+
+    /** How many review cards are due on [today] (epoch day) — drives the home nudge and the deck badge. */
+    fun dueReviewCount(today: Long): Int = Srs.dueCount(srsCards, today)
+
+    /**
+     * Record a review of puzzle [id] on [today], rescheduling (or creating) its SM-2 card. Missed
+     * puzzles enter the deck; solved ones already in the deck graduate to a longer interval.
+     */
+    fun scheduleReview(id: String, grade: Grade, today: Long) {
+        val cards = srsCards
+        val base = cards.firstOrNull { it.id == id } ?: Srs.new(id, today)
+        srsCards = cards.filter { it.id != id } + Srs.review(base, grade, today)
+    }
 
     /** Record a solved/missed attempt for a puzzle [theme] (for weakness tracking). */
     fun recordTheme(theme: String, solved: Boolean) {
@@ -119,10 +144,11 @@ class UserStore(context: Context) {
         const val KEY_SOLVED = "solvedCount"
         const val KEY_STREAK = "streak"
         const val KEY_BEST_STREAK = "bestStreak"
-        const val KEY_REVIEW = "reviewIds"
+        const val KEY_SRS = "srsCards"
         const val KEY_THEMES = "themeStats"
         const val KEY_SOUND = "soundOn"
         const val KEY_ONBOARDED = "onboardingSeen"
+        const val KEY_PLACED = "placementDone"
         const val KEY_LESSONS = "completedLessons"
         const val KEY_GAMES = "recentGames"
         const val KEY_DRILLS = "completedDrills"

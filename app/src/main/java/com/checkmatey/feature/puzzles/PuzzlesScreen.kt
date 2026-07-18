@@ -37,19 +37,26 @@ import com.checkmatey.core.chess.Move
 import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.chess.toSan
+import com.checkmatey.core.puzzle.Puzzle
 import com.checkmatey.core.puzzle.PuzzleRepository
 import com.checkmatey.core.puzzle.Rating
+import com.checkmatey.core.srs.Grade
+import com.checkmatey.core.srs.Srs
 import com.checkmatey.data.UserStore
 import com.checkmatey.ui.board.ChessBoard
 import kotlinx.coroutines.delay
 
 private enum class PuzzleState { SOLVING, SOLVED, FAILED }
 
+/** New puzzles near your rating, or spaced-repetition review of ones you've missed. */
+private enum class Mode { NEW, REVIEW }
+
 /**
- * Puzzles tab: a rating-based tactics trainer over the Lichess CC0 set. Each puzzle is a forced
- * line — play the best move, the opponent's reply plays itself, keep going to the end. Solving
- * raises your rating, missing lowers it, and the next puzzle is picked near your current level, so
- * difficulty adapts as you improve. Progress persists via [UserStore].
+ * Puzzles tab: a rating-based tactics trainer over the Lichess CC0 set, now backed by **spaced
+ * repetition** (core/srs). Solving a new puzzle raises your rating and picks a harder one; missing
+ * it files the puzzle into an SM-2 review deck that resurfaces it — 1 day, then 6, then further out
+ * — right as you're about to forget the pattern. When cards are due the tab opens straight into
+ * Review mode; you can switch to fresh puzzles anytime. Progress persists via [UserStore].
  */
 @Composable
 fun PuzzlesScreen(modifier: Modifier = Modifier) {
@@ -57,20 +64,40 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     val store = remember { UserStore(context) }
     val repo = remember { PuzzleRepository(context) }
     val haptic = LocalHapticFeedback.current
+    val today = remember { System.currentTimeMillis() / 86_400_000L }
 
     var rating by remember { mutableIntStateOf(store.puzzleRating) }
     var streak by remember { mutableIntStateOf(store.streak) }
     var bestStreak by remember { mutableIntStateOf(store.bestStreak) }
     var solvedCount by remember { mutableIntStateOf(store.solvedCount) }
     var solvedIds by remember { mutableStateOf(emptySet<String>()) }
-    var reviewIds by remember { mutableStateOf(store.reviewIds) }
+    var srsCards by remember { mutableStateOf(store.srsCards) }
     var weakest by remember { mutableStateOf(store.weakestTheme()) }
     var focusWeakness by rememberSaveable { mutableStateOf(false) }
     // Themes the last game review flagged (review -> targeted practice).
     val themes = remember { repo.themes() }
     var recommended by remember { mutableStateOf(store.recommendedThemes.firstOrNull { it in themes }) }
 
-    var puzzle by remember { mutableStateOf(repo.next(store.puzzleRating, emptySet())) }
+    // The review deck: due card ids present in the asset, taken as a snapshot for this session.
+    fun freshQueue(): List<String> = Srs.due(srsCards, today).map { it.id }.filter { repo.byId(it) != null }
+    var reviewQueue by remember { mutableStateOf(freshQueue()) }
+    var reviewPos by remember { mutableIntStateOf(0) }
+    var mode by rememberSaveable { mutableStateOf(if (reviewQueue.isNotEmpty()) Mode.REVIEW else Mode.NEW) }
+    val dueNow = Srs.dueCount(srsCards, today)
+
+    fun pickNew(): Puzzle = repo.next(
+        rating = rating,
+        solved = solvedIds,
+        themeFilter = when {
+            recommended != null -> recommended
+            focusWeakness -> weakest
+            else -> null
+        },
+    )
+
+    var puzzle by remember {
+        mutableStateOf(reviewQueue.getOrNull(0)?.let { repo.byId(it) } ?: pickNew())
+    }
     var selected by remember { mutableStateOf<Square?>(null) }
     var state by remember { mutableStateOf(PuzzleState.SOLVING) }
     // Multi-move solving: [step] is the index of the next expected solver move in solution (even
@@ -89,6 +116,12 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
         emptySet()
     }
 
+    fun serve(p: Puzzle) {
+        puzzle = p
+        selected = null
+        state = PuzzleState.SOLVING
+    }
+
     // The opponent's forced reply plays itself after a short beat, then it's the player's turn again.
     LaunchedEffect(awaitingReply, puzzle) {
         if (awaitingReply) {
@@ -104,6 +137,11 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     }
 
     fun finish(solved: Boolean) {
+        // Every review counts toward the schedule; a missed *new* puzzle enters the deck too.
+        if (mode == Mode.REVIEW || !solved) {
+            store.scheduleReview(puzzle.id, if (solved) Grade.GOOD else Grade.AGAIN, today)
+            srsCards = store.srsCards
+        }
         store.recordTheme(puzzle.theme, solved)
         rating = Rating.update(rating, puzzle.rating, solved)
         store.puzzleRating = rating
@@ -112,30 +150,41 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             solvedCount += 1; store.solvedCount = solvedCount
             streak += 1; store.streak = streak
             if (streak > bestStreak) { bestStreak = streak; store.bestStreak = bestStreak }
-            reviewIds = (reviewIds - puzzle.id).also { store.reviewIds = it } // solved -> off the review queue
             state = PuzzleState.SOLVED
         } else {
             streak = 0; store.streak = 0
-            reviewIds = (reviewIds + puzzle.id).also { store.reviewIds = it } // missed -> review later
             state = PuzzleState.FAILED
         }
         weakest = store.weakestTheme()
     }
 
     fun loadNext() {
-        solvedIds = solvedIds + puzzle.id
-        puzzle = repo.next(
-            rating = rating,
-            solved = solvedIds,
-            reviewIds = reviewIds,
-            themeFilter = when {
-                recommended != null -> recommended
-                focusWeakness -> weakest
-                else -> null
-            },
-        )
-        selected = null
-        state = PuzzleState.SOLVING
+        if (mode == Mode.REVIEW) {
+            reviewPos += 1
+            val nextId = reviewQueue.getOrNull(reviewPos)
+            if (nextId != null) {
+                serve(repo.byId(nextId)!!)
+            } else {
+                mode = Mode.NEW // deck cleared for today — back to fresh puzzles
+                serve(pickNew())
+            }
+        } else {
+            solvedIds = solvedIds + puzzle.id
+            serve(pickNew())
+        }
+    }
+
+    fun enterReview() {
+        reviewQueue = freshQueue()
+        reviewPos = 0
+        if (reviewQueue.isEmpty()) return // nothing due — stay put
+        mode = Mode.REVIEW
+        serve(repo.byId(reviewQueue[0])!!)
+    }
+
+    fun enterNew() {
+        mode = Mode.NEW
+        serve(pickNew())
     }
 
     fun onSquareClick(square: Square) {
@@ -173,34 +222,43 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         StatBar(rating = rating, streak = streak, bestStreak = bestStreak, solved = solvedCount)
-        recommended?.let { theme ->
-            Spacer(Modifier.height(6.dp))
-            Surface(
-                onClick = { store.recommendedThemes = emptyList(); recommended = null; loadNext() },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ) {
-                Text(
-                    "🎯 복기에서 찾은 약점: \"$theme\" — 지금 이 테마를 훈련 중입니다 (탭하면 일반 퍼즐로)",
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        WeaknessRow(
-            focus = focusWeakness,
-            onToggle = { focusWeakness = it },
-            weakest = weakest,
-            weakestRate = weakest?.let { store.successRate(it) },
-            reviewCount = reviewIds.size,
+        Spacer(Modifier.height(8.dp))
+        ModeRow(
+            mode = mode,
+            dueCount = dueNow,
+            onNew = { if (mode != Mode.NEW) enterNew() },
+            onReview = { if (mode != Mode.REVIEW) enterReview() },
         )
+        if (mode == Mode.NEW) {
+            recommended?.let { theme ->
+                Spacer(Modifier.height(6.dp))
+                Surface(
+                    onClick = { store.recommendedThemes = emptyList(); recommended = null; serve(pickNew()) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ) {
+                    Text(
+                        "🎯 복기에서 찾은 약점: \"$theme\" — 지금 이 테마를 훈련 중입니다 (탭하면 일반 퍼즐로)",
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            WeaknessRow(
+                focus = focusWeakness,
+                onToggle = { focusWeakness = it },
+                weakest = weakest,
+                weakestRate = weakest?.let { store.successRate(it) },
+            )
+        }
         Spacer(Modifier.height(10.dp))
         StatusCard(
             state = state,
+            reviewMode = mode == Mode.REVIEW,
             theme = puzzle.theme,
             puzzleRating = puzzle.rating,
             sideToMove = solverColor,
@@ -225,7 +283,9 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
 
         Spacer(Modifier.height(10.dp))
         if (state != PuzzleState.SOLVING) {
-            Button(onClick = ::loadNext) { Text("다음 문제 →") }
+            Button(onClick = ::loadNext) {
+                Text(if (mode == Mode.REVIEW) "다음 복습 →" else "다음 문제 →")
+            }
         } else {
             Text(
                 if (step == 0) "기물을 탭해 최선의 수를 두세요" else "좋아요 — 수순을 계속 이어가세요",
@@ -237,12 +297,59 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun ModeRow(mode: Mode, dueCount: Int, onNew: () -> Unit, onReview: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ModeChip(
+            label = "새 문제",
+            selected = mode == Mode.NEW,
+            enabled = true,
+            onClick = onNew,
+            modifier = Modifier.weight(1f),
+        )
+        ModeChip(
+            label = if (dueCount > 0) "복습 $dueCount" else "복습",
+            selected = mode == Mode.REVIEW,
+            enabled = dueCount > 0 || mode == Mode.REVIEW,
+            onClick = onReview,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun ModeChip(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = if (selected) scheme.primary else scheme.surface,
+        contentColor = if (selected) scheme.onPrimary else if (enabled) scheme.onSurface else scheme.onSurfaceVariant,
+        border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
+    ) {
+        Text(
+            label,
+            Modifier.fillMaxWidth().padding(vertical = 10.dp),
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.Center,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        )
+    }
+}
+
+@Composable
 private fun WeaknessRow(
     focus: Boolean,
     onToggle: (Boolean) -> Unit,
     weakest: String?,
     weakestRate: Int?,
-    reviewCount: Int,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -260,10 +367,6 @@ private fun WeaknessRow(
         }
         val label = buildString {
             if (weakest != null) append("약점: $weakest ${weakestRate ?: 0}%")
-            if (reviewCount > 0) {
-                if (isNotEmpty()) append("  ·  ")
-                append("복습 $reviewCount")
-            }
             if (isEmpty()) append("풀수록 약점을 찾아 드립니다")
         }
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -291,6 +394,7 @@ private fun StatBar(rating: Int, streak: Int, bestStreak: Int, solved: Int) {
 @Composable
 private fun StatusCard(
     state: PuzzleState,
+    reviewMode: Boolean,
     theme: String,
     puzzleRating: Int,
     sideToMove: PieceColor,
@@ -300,11 +404,12 @@ private fun StatusCard(
     val scheme = MaterialTheme.colorScheme
     val side = if (sideToMove == PieceColor.WHITE) "백" else "흑"
     val moveHint = if (movesLeft > 1) " · ${movesLeft}수 수순" else ""
+    val tag = if (reviewMode) "🔁 복습 · " else ""
     val (container, onContainer, text) = when (state) {
         PuzzleState.SOLVING -> Triple(
             scheme.surfaceVariant,
             scheme.onSurfaceVariant,
-            "$theme · $puzzleRating$moveHint\n$side 차례 — 최선의 수를 찾으세요",
+            "$tag$theme · $puzzleRating$moveHint\n$side 차례 — 최선의 수를 찾으세요",
         )
         PuzzleState.SOLVED -> Triple(scheme.tertiaryContainer, scheme.onTertiaryContainer, "정답입니다! ✓")
         PuzzleState.FAILED -> Triple(scheme.errorContainer, scheme.onErrorContainer, "아쉬워요. 정답은 ${failedSan ?: "?"} 였습니다")

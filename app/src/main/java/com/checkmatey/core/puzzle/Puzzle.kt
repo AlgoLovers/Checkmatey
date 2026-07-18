@@ -37,23 +37,21 @@ class PuzzleRepository(private val context: Context) {
 
     fun themes(): List<String> = all().map { it.theme }.distinct()
 
+    /** Looks up a puzzle by id — used to re-serve a spaced-repetition review card (see core/srs). */
+    fun byId(id: String): Puzzle? = (index ?: all().associateBy { it.id }.also { index = it })[id]
+
     /**
-     * Picks the next puzzle. Spaced-repetition-lite: a previously-missed puzzle ([reviewIds]) is
-     * re-served part of the time. Weakness focus: [themeFilter] restricts to one theme. Otherwise
-     * an unsolved puzzle near [rating] is chosen so difficulty tracks the player.
+     * Picks the next *new* puzzle. Weakness focus: [themeFilter] restricts to one theme. Otherwise
+     * an unsolved puzzle near [rating] is chosen so difficulty tracks the player. Review of missed
+     * puzzles is handled separately by the SM-2 scheduler (core/srs), not here.
      */
     fun next(
         rating: Int,
         solved: Set<String>,
         random: Random = Random.Default,
-        reviewIds: List<String> = emptyList(),
         themeFilter: String? = null,
     ): Puzzle {
         val puzzles = all()
-        val reviewPool = puzzles.filter { it.id in reviewIds }
-        if (reviewPool.isNotEmpty() && random.nextDouble() < 0.4) {
-            return reviewPool[random.nextInt(reviewPool.size)]
-        }
         var pool = puzzles.filter { it.id !in solved }
         if (themeFilter != null) pool = pool.filter { it.theme == themeFilter }.ifEmpty { pool }
         if (pool.isEmpty()) pool = puzzles
@@ -64,6 +62,7 @@ class PuzzleRepository(private val context: Context) {
 
     companion object {
         @Volatile private var cached: List<Puzzle>? = null
+        @Volatile private var index: Map<String, Puzzle>? = null
 
         private fun load(context: Context): List<Puzzle> =
             context.assets.open("puzzles.csv").bufferedReader().useLines { lines ->
