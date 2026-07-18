@@ -1,6 +1,8 @@
 package com.checkmatey.data
 
 import android.content.Context
+import com.checkmatey.core.habit.DailyGoal
+import com.checkmatey.core.habit.DailyState
 import com.checkmatey.core.puzzle.Rating
 import com.checkmatey.core.srs.Grade
 import com.checkmatey.core.srs.Srs
@@ -139,6 +141,29 @@ class UserStore(context: Context) {
         ratingHistory = ratingHistory + rating
     }
 
+    // ---- Daily habit loop (see core/habit/DailyGoal) ----
+
+    private fun rawDaily(): DailyState = DailyState(
+        dayStreak = prefs.getInt(KEY_DAY_STREAK, 0),
+        longestStreak = prefs.getInt(KEY_DAY_LONGEST, 0),
+        solvedToday = prefs.getInt(KEY_DAY_SOLVED, 0),
+        lastActiveDay = prefs.getLong(KEY_DAY_LAST, 0),
+    )
+
+    private fun writeDaily(s: DailyState) = prefs.edit()
+        .putInt(KEY_DAY_STREAK, s.dayStreak)
+        .putInt(KEY_DAY_LONGEST, s.longestStreak)
+        .putInt(KEY_DAY_SOLVED, s.solvedToday)
+        .putLong(KEY_DAY_LAST, s.lastActiveDay)
+        .apply()
+
+    /** The daily state as it should read on [today] (streak lapses / count resets on a new day). */
+    fun dailyState(today: Long): DailyState = DailyGoal.viewOn(rawDaily(), today)
+
+    /** Record one solved puzzle for [today]'s goal & streak; returns the updated view. */
+    fun recordSolvedToday(today: Long): DailyState =
+        DailyGoal.onSolved(rawDaily(), today).also { writeDaily(it) }
+
     private companion object {
         const val KEY_RATING = "puzzleRating"
         const val KEY_SOLVED = "solvedCount"
@@ -155,5 +180,9 @@ class UserStore(context: Context) {
         const val KEY_REC_THEMES = "recommendedThemes"
         const val KEY_RATING_HIST = "ratingHistory"
         const val KEY_REVIEWED = "reviewedLatestGame"
+        const val KEY_DAY_STREAK = "dayStreak"
+        const val KEY_DAY_LONGEST = "dayLongest"
+        const val KEY_DAY_SOLVED = "daySolved"
+        const val KEY_DAY_LAST = "dayLast"
     }
 }

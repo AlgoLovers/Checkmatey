@@ -148,6 +148,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
         store.pushRating(rating)
         if (solved) {
             solvedCount += 1; store.solvedCount = solvedCount
+            store.recordSolvedToday(today) // daily goal + day streak
             streak += 1; store.streak = streak
             if (streak > bestStreak) { bestStreak = streak; store.bestStreak = bestStreak }
             state = PuzzleState.SOLVED

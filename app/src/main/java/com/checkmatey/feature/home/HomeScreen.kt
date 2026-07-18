@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.checkmatey.core.habit.DailyGoal
 import com.checkmatey.core.plan.Planner
 import com.checkmatey.core.plan.Progress
 import com.checkmatey.core.plan.StepTarget
@@ -87,6 +89,43 @@ fun HomeScreen(
                 Spacer(Modifier.height(18.dp))
                 GradientPrimaryButton(onClick = { onGo(step.target) }, modifier = Modifier.fillMaxWidth()) {
                     Text(step.cta, style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+
+        // Daily habit — a streak that only survives if you practise every day, and today's goal.
+        val daily = store.dailyState(today)
+        val goalMet = DailyGoal.metToday(daily)
+        Spacer(Modifier.height(12.dp))
+        Surface(
+            onClick = { onGo(StepTarget.PUZZLE) },
+            Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = if (goalMet) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = if (goalMet) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface,
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text("🔥", style = MaterialTheme.typography.headlineMedium)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (daily.dayStreak > 0) "${daily.dayStreak}일 연속 학습 중!" else "오늘 시작해 연속 기록을 만들어요",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { (daily.solvedToday.coerceAtMost(DailyGoal.GOAL)) / DailyGoal.GOAL.toFloat() },
+                        modifier = Modifier.fillMaxWidth().height(6.dp),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        if (goalMet) "✓ 오늘 목표 달성! (${daily.solvedToday}문제)" else "오늘의 목표  ${daily.solvedToday}/${DailyGoal.GOAL} 퍼즐",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
