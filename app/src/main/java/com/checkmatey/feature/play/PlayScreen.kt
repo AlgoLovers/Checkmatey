@@ -52,6 +52,8 @@ import com.checkmatey.core.engine.BotLevel
 import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.core.engine.MoveAnnotation
 import com.checkmatey.core.engine.MoveQuality
+import com.checkmatey.core.engine.Tutor
+import com.checkmatey.core.engine.Threat
 import com.checkmatey.core.study.StudyGames
 import com.checkmatey.data.UserStore
 import com.checkmatey.feature.review.ReviewScreen
@@ -95,6 +97,12 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     var coachOn by rememberSaveable { mutableStateOf(true) }
     var hint by remember { mutableStateOf<MoveAnnotation?>(null) }
     var feedback by remember { mutableStateOf<MoveAnnotation?>(null) }
+    // Tutor layer: staged Socratic hint (question → piece → answer), live threat warnings,
+    // and the "this keeps happening" recall line tied to the player's weakness history.
+    var hintStage by remember { mutableStateOf(0) }
+    var hintLadder by remember { mutableStateOf<List<String>>(emptyList()) }
+    var threats by remember { mutableStateOf<List<Threat>>(emptyList()) }
+    var recall by remember { mutableStateOf<String?>(null) }
     var promotionChoice by remember { mutableStateOf<List<Move>>(emptyList()) }
     val moves = remember { mutableStateListOf<Move>() }
     // Position after every ply (starts with the current position) — powers undo and
@@ -125,7 +133,12 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     val targets: Set<Square> = selected?.let { from ->
         position.legalMoves().filter { it.from == from }.map { it.to }.toSet()
     } ?: emptySet()
-    val hintSquares: Set<Square> = hint?.bestMove?.let { setOf(it.from, it.to) } ?: emptySet()
+    // Hints reveal the board gradually: nothing at the question stage, the piece at stage 2, all at 3.
+    val hintSquares: Set<Square> = when {
+        hintStage >= 3 -> hint?.bestMove?.let { setOf(it.from, it.to) } ?: emptySet()
+        hintStage == 2 -> hint?.bestMove?.let { setOf(it.from) } ?: emptySet()
+        else -> emptySet()
+    }
     val effectiveLevel = if (adaptive) BotLevel.forRating(userRating) else level
 
     fun applyMove(move: Move) {
@@ -135,6 +148,8 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         history.add(position)
         lastMove = move
         hint = null
+        hintStage = 0
+        hintLadder = emptyList()
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         if (soundOn) {
             soundFx.play(
@@ -156,7 +171,10 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         selected = null
         lastMove = null
         hint = null
+        hintStage = 0
+        hintLadder = emptyList()
         feedback = null
+        recall = null
         gameOverSeen = false
     }
 
@@ -174,8 +192,20 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         lastMove = moves.lastOrNull()
         selected = null
         hint = null
+        hintStage = 0
+        hintLadder = emptyList()
         feedback = null
+        recall = null
         gameOverSeen = false
+    }
+
+    // Threat radar: while it's the student's turn, watch the board like a tutor would.
+    LaunchedEffect(position, coachOn) {
+        threats = if (coachOn && isHumanTurn) {
+            withContext(Dispatchers.Default) { Tutor.threats(position, humanColor) }
+        } else {
+            emptyList()
+        }
     }
 
     LaunchedEffect(position) {
@@ -212,7 +242,23 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             applyMove(move)
             selected = null
             feedback = null
-            if (coachOn) scope.launch { feedback = withContext(Dispatchers.Default) { annotator.annotate(before, move) } }
+            recall = null
+            if (coachOn) {
+                scope.launch {
+                    val fb = withContext(Dispatchers.Default) { annotator.annotate(before, move) }
+                    feedback = fb
+                    // "This keeps happening": connect the mistake to the player's weakness history.
+                    recall = if (fb.quality.ordinal >= MoveQuality.MISTAKE.ordinal) {
+                        Tutor.themeOf(fb.reason)?.let { theme ->
+                            store.themeStats()[theme]?.let { (attempts, _) ->
+                                Tutor.recallLine(theme, attempts, store.successRate(theme))
+                            }
+                        }
+                    } else {
+                        null
+                    }
+                }
+            }
         } else {
             selected = if (position.pieceAt(square)?.color == humanColor) square else null
         }
@@ -240,9 +286,22 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FilledTonalButton(
-                onClick = { if (isHumanTurn) scope.launch { hint = withContext(Dispatchers.Default) { annotator.hint(position) }; feedback = null } },
-                enabled = isHumanTurn,
-            ) { Text("💡 힌트") }
+                onClick = {
+                    if (!isHumanTurn) return@FilledTonalButton
+                    if (hintStage == 0) {
+                        scope.launch {
+                            val h = withContext(Dispatchers.Default) { annotator.hint(position) }
+                            hint = h
+                            hintLadder = h?.let { Tutor.hintLadder(position, it) } ?: emptyList()
+                            hintStage = if (h != null) 1 else 0
+                            feedback = null
+                        }
+                    } else if (hintStage < 3) {
+                        hintStage++
+                    }
+                },
+                enabled = isHumanTurn && hintStage < 3,
+            ) { Text(if (hintStage == 0) "💡 힌트" else "💡 더 보기 $hintStage/3") }
             Toggle(label = "코치", on = coachOn, onChange = { coachOn = it; if (!it) feedback = null })
             Toggle(label = "적응", on = adaptive, onChange = { adaptive = it })
             Toggle(label = "소리", on = soundOn, onChange = { soundOn = it; store.soundOn = it })
@@ -264,7 +323,42 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        CoachCard(hint = hint, feedback = feedback.takeIf { coachOn })
+        // Tutor voice, in priority order: threat warning (before you move) → hint ladder → coach verdict.
+        if (threats.isNotEmpty() && isHumanTurn && hintStage == 0 && feedback == null) {
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            ) {
+                Text(
+                    threats.joinToString("\n") { it.text },
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+        }
+        if (hintStage in 1..hintLadder.size) {
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ) {
+                Text(
+                    hintLadder[hintStage - 1],
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+        }
+        CoachCard(hint = null, feedback = feedback.takeIf { coachOn })
+        recall?.takeIf { coachOn }?.let {
+            Spacer(Modifier.height(6.dp))
+            Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = ::undo, enabled = moves.isNotEmpty() && !thinking) { Text("↩ 무르기") }
