@@ -60,6 +60,7 @@ import com.checkmatey.data.UserStore
 import com.checkmatey.feature.review.ReviewScreen
 import com.checkmatey.sound.Sfx
 import com.checkmatey.sound.SoundFx
+import com.checkmatey.ui.board.CaptureFx
 import com.checkmatey.ui.board.ChessBoard
 import com.checkmatey.ui.components.EvalBar
 import kotlinx.coroutines.Dispatchers
@@ -106,8 +107,8 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     var threats by remember { mutableStateOf<List<Threat>>(emptyList()) }
     var recall by remember { mutableStateOf<String?>(null) }
     var promotionChoice by remember { mutableStateOf<List<Move>>(emptyList()) }
-    // Capture pop effect target: (square, counter) so consecutive captures on one square re-fire.
-    var captureFx by remember { mutableStateOf<Pair<Square, Int>?>(null) }
+    // Capture pop effect — sized by the captured piece; counter re-fires repeats on one square.
+    var captureFx by remember { mutableStateOf<CaptureFx?>(null) }
     var showCaptured by remember { mutableStateOf(false) }
     val moves = remember { mutableStateListOf<Move>() }
     // Position after every ply (starts with the current position) — powers undo and
@@ -147,12 +148,13 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     val effectiveLevel = if (adaptive) BotLevel.forRating(userRating) else level
 
     fun applyMove(move: Move) {
-        val capture = position.pieceAt(move.to) != null || move.isEnPassant
+        val victim = position.pieceAt(move.to)?.type ?: if (move.isEnPassant) PieceType.PAWN else null
+        val capture = victim != null
         position = position.applyMove(move)
         moves.add(move)
         history.add(position)
         lastMove = move
-        if (capture) captureFx = move.to to ((captureFx?.second ?: 0) + 1)
+        if (victim != null) captureFx = CaptureFx(move.to, victim, (captureFx?.counter ?: 0) + 1)
         hint = null
         hintStage = 0
         hintLadder = emptyList()

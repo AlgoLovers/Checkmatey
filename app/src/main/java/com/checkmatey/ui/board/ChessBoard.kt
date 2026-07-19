@@ -67,8 +67,8 @@ fun ChessBoard(
     lastMove: Move? = null,
     hintSquares: Set<Square> = emptySet(),
     arrows: List<BoardArrow> = emptyList(),
-    // (square, counter) — a capture "pop" plays at the square whenever the pair changes.
-    captureEffect: Pair<Square, Int>? = null,
+    // A capture "pop" plays at the square whenever the value changes; scale grows with the piece.
+    captureEffect: CaptureFx? = null,
     onSquareClick: ((Square) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier.aspectRatio(1f)) {
@@ -160,31 +160,63 @@ fun ChessBoard(
             }
         }
 
-        // Capture pop: an expanding golden ring at the capture square — a small, satisfying "got it!".
+        // Capture pop, scaled to what was taken: a pawn gives a small tick, a minor piece the classic
+        // ring, a rook a double ripple, a queen a full golden burst with rays. The prize should FEEL
+        // like the prize.
         if (captureEffect != null) {
+            val tier = captureTier(captureEffect.piece)
             val pop = remember(captureEffect) { Animatable(0f) }
-            LaunchedEffect(captureEffect) { pop.animateTo(1f, tween(durationMillis = 380)) }
+            LaunchedEffect(captureEffect) { pop.animateTo(1f, tween(durationMillis = tier.durationMs)) }
             val p = pop.value
             if (p < 1f) {
                 val cellPx = with(LocalDensity.current) { cell.toPx() }
                 Canvas(Modifier.matchParentSize()) {
-                    val sq = captureEffect.first
+                    val sq = captureEffect.square
                     val center = Offset(
                         x = (sq.file + 0.5f) * cellPx,
                         y = (7 - sq.rank + 0.5f) * cellPx,
                     )
                     val alpha = 1f - p
+                    // Main ring.
                     drawCircle(
                         color = Color(0xFFFFC46A).copy(alpha = alpha * 0.85f),
-                        radius = cellPx * (0.15f + 0.55f * p),
+                        radius = cellPx * (0.15f + tier.ringScale * p),
                         center = center,
                         style = Stroke(width = cellPx * 0.10f * (1f - 0.6f * p)),
                     )
+                    // Bright core flash.
                     drawCircle(
-                        color = Color(0xFFFFF3DC).copy(alpha = alpha * 0.5f),
+                        color = Color(0xFFFFF3DC).copy(alpha = alpha * tier.coreAlpha),
                         radius = cellPx * 0.30f * (1f - p),
                         center = center,
                     )
+                    // Second ripple for rook and queen — a delayed echo of the main ring.
+                    if (tier.doubleRing && p > 0.25f) {
+                        val p2 = (p - 0.25f) / 0.75f
+                        drawCircle(
+                            color = Color(0xFFFFD98E).copy(alpha = (1f - p2) * 0.6f),
+                            radius = cellPx * (0.10f + tier.ringScale * 1.25f * p2),
+                            center = center,
+                            style = Stroke(width = cellPx * 0.06f),
+                        )
+                    }
+                    // Queen only: eight golden rays bursting outward.
+                    if (tier.rays) {
+                        val rayLen = cellPx * (0.35f + 0.75f * p)
+                        val inner = cellPx * 0.25f * (1f + p)
+                        for (k in 0 until 8) {
+                            val angle = Math.PI / 4 * k
+                            val dx = kotlin.math.cos(angle).toFloat()
+                            val dy = kotlin.math.sin(angle).toFloat()
+                            drawLine(
+                                color = Color(0xFFFFE2A6).copy(alpha = alpha * 0.9f),
+                                start = Offset(center.x + dx * inner, center.y + dy * inner),
+                                end = Offset(center.x + dx * rayLen, center.y + dy * rayLen),
+                                strokeWidth = cellPx * 0.05f * (1f - 0.5f * p),
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -207,6 +239,29 @@ fun ChessBoard(
 
 /** An arrow to draw on the board, from [from] to [to]. */
 data class BoardArrow(val from: Square, val to: Square, val color: Color)
+
+/**
+ * A capture to celebrate: where, what was taken (drives the effect size), and a counter so
+ * consecutive captures on the same square still re-fire the animation.
+ */
+data class CaptureFx(val square: Square, val piece: PieceType, val counter: Int)
+
+/** Effect parameters per captured-piece tier — the prize should feel like the prize. */
+private data class CaptureTier(
+    val durationMs: Int,
+    val ringScale: Float,
+    val coreAlpha: Float,
+    val doubleRing: Boolean,
+    val rays: Boolean,
+)
+
+private fun captureTier(piece: PieceType): CaptureTier = when (piece) {
+    PieceType.PAWN -> CaptureTier(durationMs = 280, ringScale = 0.35f, coreAlpha = 0.35f, doubleRing = false, rays = false)
+    PieceType.KNIGHT, PieceType.BISHOP -> CaptureTier(durationMs = 380, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false)
+    PieceType.ROOK -> CaptureTier(durationMs = 470, ringScale = 0.70f, coreAlpha = 0.6f, doubleRing = true, rays = false)
+    PieceType.QUEEN -> CaptureTier(durationMs = 600, ringScale = 0.85f, coreAlpha = 0.75f, doubleRing = true, rays = true)
+    PieceType.KING -> CaptureTier(durationMs = 380, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false)
+}
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawArrow(
     start: Offset,
