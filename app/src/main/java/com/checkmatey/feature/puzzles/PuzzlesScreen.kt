@@ -43,6 +43,8 @@ import com.checkmatey.core.puzzle.Rating
 import com.checkmatey.core.srs.Grade
 import com.checkmatey.core.srs.Srs
 import com.checkmatey.data.UserStore
+import com.checkmatey.sound.Sfx
+import com.checkmatey.sound.SoundFx
 import com.checkmatey.ui.board.ChessBoard
 import kotlinx.coroutines.delay
 
@@ -64,6 +66,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     val store = remember { UserStore(context) }
     val repo = remember { PuzzleRepository(context) }
     val haptic = LocalHapticFeedback.current
+    val soundFx = remember { SoundFx() }
     val today = remember { System.currentTimeMillis() / 86_400_000L }
 
     var rating by remember { mutableIntStateOf(store.puzzleRating) }
@@ -142,6 +145,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             store.scheduleReview(puzzle.id, if (solved) Grade.GOOD else Grade.AGAIN, today)
             srsCards = store.srsCards
         }
+        if (store.soundOn) soundFx.play(if (solved) Sfx.CORRECT else Sfx.WRONG)
         store.recordTheme(puzzle.theme, solved)
         rating = Rating.update(rating, puzzle.rating, solved)
         store.puzzleRating = rating

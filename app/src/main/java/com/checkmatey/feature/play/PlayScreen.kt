@@ -164,7 +164,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
                 when {
                     position.isCheckmate() -> if (position.sideToMove == humanColor) Sfx.LOSE else Sfx.WIN
                     position.isInCheck() -> Sfx.CHECK
-                    capture -> Sfx.CAPTURE
+                    victim != null -> soundFx.captureFor(victim.letter) // heftier sound for a bigger piece
                     else -> Sfx.MOVE
                 },
             )

@@ -219,6 +219,22 @@ fun ChessBoard(
                             )
                         }
                     }
+                    // Confetti shards bursting out and arcing down — the playful bit. Angles/speeds
+                    // are derived from the particle index so they're stable across recompositions.
+                    for (k in 0 until tier.particles) {
+                        val ang = (k * 2.399963f) // golden-angle spread, no clustering
+                        val speed = 0.55f + 0.45f * ((k * 7) % 10) / 10f
+                        val dist = cellPx * (tier.ringScale + 0.5f) * speed * p
+                        val gravity = cellPx * 0.9f * p * p // arc downward like real confetti
+                        val px = center.x + kotlin.math.cos(ang) * dist
+                        val py = center.y + kotlin.math.sin(ang) * dist + gravity
+                        val size = cellPx * (0.05f + 0.03f * ((k * 3) % 5) / 5f) * (1f - 0.5f * p)
+                        drawCircle(
+                            color = CaptureConfetti[k % CaptureConfetti.size].copy(alpha = alpha),
+                            radius = size,
+                            center = Offset(px, py),
+                        )
+                    }
                 }
             }
         }
@@ -255,15 +271,21 @@ private data class CaptureTier(
     val coreAlpha: Float,
     val doubleRing: Boolean,
     val rays: Boolean,
+    val particles: Int, // little shards that burst outward — the "fun"
 )
 
 private fun captureTier(piece: PieceType): CaptureTier = when (piece) {
-    PieceType.PAWN -> CaptureTier(durationMs = 650, ringScale = 0.35f, coreAlpha = 0.35f, doubleRing = false, rays = false)
-    PieceType.KNIGHT, PieceType.BISHOP -> CaptureTier(durationMs = 850, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false)
-    PieceType.ROOK -> CaptureTier(durationMs = 1000, ringScale = 0.70f, coreAlpha = 0.6f, doubleRing = true, rays = false)
-    PieceType.QUEEN -> CaptureTier(durationMs = 1250, ringScale = 0.85f, coreAlpha = 0.75f, doubleRing = true, rays = true)
-    PieceType.KING -> CaptureTier(durationMs = 850, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false)
+    PieceType.PAWN -> CaptureTier(650, ringScale = 0.35f, coreAlpha = 0.35f, doubleRing = false, rays = false, particles = 5)
+    PieceType.KNIGHT, PieceType.BISHOP -> CaptureTier(850, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false, particles = 9)
+    PieceType.ROOK -> CaptureTier(1000, ringScale = 0.70f, coreAlpha = 0.6f, doubleRing = true, rays = false, particles = 13)
+    PieceType.QUEEN -> CaptureTier(1250, ringScale = 0.85f, coreAlpha = 0.75f, doubleRing = true, rays = true, particles = 18)
+    PieceType.KING -> CaptureTier(850, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false, particles = 9)
 }
+
+// Warm confetti palette for the shards — reads as celebratory, not clinical.
+private val CaptureConfetti = listOf(
+    Color(0xFFFFC46A), Color(0xFFFF8A5B), Color(0xFFFFE08A), Color(0xFF6FE0B0), Color(0xFFFFF3DC),
+)
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawArrow(
     start: Offset,

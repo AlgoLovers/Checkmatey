@@ -8,13 +8,10 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
+import com.checkmatey.ui.icons.AppIcons
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
@@ -43,11 +40,11 @@ import com.checkmatey.feature.study.StudyScreen
 /** Top-level tabs. */
 private enum class TopDestination(val label: String, val icon: ImageVector) {
     HOME("홈", Icons.Filled.Home),
-    LESSONS("레슨", Icons.Filled.Edit),
-    LEARN("명국", Icons.Filled.Star),
+    LESSONS("레슨", AppIcons.Book),
+    LEARN("명국", AppIcons.Trophy),
     PLAY("대국", Icons.Filled.PlayArrow),
-    PUZZLES("퍼즐", Icons.Filled.Search),
-    PROFILE("분석", Icons.Filled.Person),
+    PUZZLES("퍼즐", AppIcons.Puzzle),
+    PROFILE("분석", AppIcons.Analysis),
 }
 
 /**
