@@ -65,6 +65,7 @@ import com.checkmatey.sound.SoundFx
 import com.checkmatey.ui.board.CaptureFx
 import com.checkmatey.ui.board.ChessBoard
 import com.checkmatey.ui.components.EvalBar
+import com.checkmatey.ui.components.ResponsiveBoardLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -410,30 +411,12 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    // Responsive: on a wide screen (tablet/landscape) the board fills the full height beside a
-    // control panel; on a phone everything stacks and the board takes the space that's left.
-    BoxWithConstraints(modifier.fillMaxSize().padding(16.dp)) {
-        if (maxWidth >= 600.dp) {
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                boardArea(Modifier.weight(1f).fillMaxHeight())
-                Column(
-                    Modifier.width(340.dp).fillMaxHeight().verticalScroll(rememberScrollState()),
-                ) {
-                    topControls()
-                    Spacer(Modifier.height(10.dp))
-                    bottomControls()
-                }
-            }
-        } else {
-            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                topControls()
-                Spacer(Modifier.height(6.dp))
-                boardArea(Modifier.weight(1f).fillMaxWidth())
-                Spacer(Modifier.height(8.dp))
-                bottomControls()
-            }
-        }
-    }
+    ResponsiveBoardLayout(
+        board = boardArea,
+        modifier = modifier,
+        top = { topControls() },
+        bottom = { bottomControls() },
+    )
 
     // Save every finished game so the 분석 tab can offer it for review.
     LaunchedEffect(gameEnded, moves.size) {

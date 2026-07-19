@@ -36,6 +36,7 @@ import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.components.ResponsiveBoardLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -112,40 +113,38 @@ fun PracticeScreen(drillId: String, title: String, startFen: String, onBack: () 
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("← 목록") }
-            Text("$plies 수", style = MaterialTheme.typography.labelLarge)
-        }
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(8.dp))
+    val scheme = MaterialTheme.colorScheme
+    val won = position.isCheckmate() && position.sideToMove != humanColor
+    if (won) LaunchedEffect(drillId) { store.completedDrills = store.completedDrills + drillId }
+    val drawn = !won && position.isGameOver() // stalemate, insufficient material, fifty-move
+    val (text, container, onContainer) = when {
+        won -> Triple("성공! 체크메이트 ✓  ($plies 수)", scheme.tertiaryContainer, scheme.onTertiaryContainer)
+        drawn -> Triple("무승부 — 실패! 스테일메이트/기물 상실을 조심하고 다시 시도하세요.", scheme.errorContainer, scheme.onErrorContainer)
+        thinking -> Triple("상대가 최선의 수비 중…", scheme.surfaceVariant, scheme.onSurfaceVariant)
+        else -> Triple("체크메이트를 완성하세요 — 상대는 최선을 다해 도망칩니다", scheme.primaryContainer, scheme.onPrimaryContainer)
+    }
 
-        val scheme = MaterialTheme.colorScheme
-        val won = position.isCheckmate() && position.sideToMove != humanColor
-        if (won) LaunchedEffect(drillId) { store.completedDrills = store.completedDrills + drillId }
-        val drawn = !won && position.isGameOver() // stalemate, insufficient material, fifty-move
-        val (text, container, onContainer) = when {
-            won -> Triple("성공! 체크메이트 ✓  ($plies 수)", scheme.tertiaryContainer, scheme.onTertiaryContainer)
-            drawn -> Triple("무승부 — 실패! 스테일메이트/기물 상실을 조심하고 다시 시도하세요.", scheme.errorContainer, scheme.onErrorContainer)
-            thinking -> Triple("상대가 최선의 수비 중…", scheme.surfaceVariant, scheme.onSurfaceVariant)
-            else -> Triple("체크메이트를 완성하세요 — 상대는 최선을 다해 도망칩니다", scheme.primaryContainer, scheme.onPrimaryContainer)
-        }
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = container, contentColor = onContainer) {
-            Text(
-                text,
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(520.dp)
+    ResponsiveBoardLayout(
+        modifier = modifier,
+        top = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onBack) { Text("← 목록") }
+                Text("$plies 수", style = MaterialTheme.typography.labelLarge)
+            }
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = container, contentColor = onContainer) {
+                Text(
+                    text,
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        },
+        board = { m ->
+            BoxWithConstraints(m, contentAlignment = Alignment.Center) {
+                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
                 ChessBoard(
                     position = position,
                     modifier = Modifier.size(side),
@@ -155,9 +154,9 @@ fun PracticeScreen(drillId: String, title: String, startFen: String, onBack: () 
                     onSquareClick = if (isHumanTurn) ::onSquareClick else null,
                 )
             }
-        }
-
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(onClick = ::restart) { Text("다시 시작") }
-    }
+        },
+        bottom = {
+            OutlinedButton(onClick = ::restart) { Text("다시 시작") }
+        },
+    )
 }

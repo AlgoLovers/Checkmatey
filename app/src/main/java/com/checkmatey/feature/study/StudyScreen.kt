@@ -181,7 +181,7 @@ private fun GameDetail(game: StudyGame, onBack: () -> Unit, modifier: Modifier) 
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(480.dp)
+                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
                 ChessBoard(
                     position = position,
                     modifier = Modifier.size(side),

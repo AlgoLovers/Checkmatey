@@ -201,7 +201,7 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
 
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 BoxWithConstraints {
-                    val side = minOf(maxWidth, maxHeight).coerceAtMost(480.dp)
+                    val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
                     ChessBoard(
                         position = pos,
                         modifier = Modifier.size(side),
@@ -257,7 +257,7 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
 
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(480.dp)
+                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
                 ChessBoard(
                     position = game.positionAt(ply),
                     modifier = Modifier.size(side),

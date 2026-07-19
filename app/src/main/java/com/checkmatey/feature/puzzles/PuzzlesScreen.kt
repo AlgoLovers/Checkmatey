@@ -46,6 +46,7 @@ import com.checkmatey.data.UserStore
 import com.checkmatey.sound.Sfx
 import com.checkmatey.sound.SoundFx
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.components.ResponsiveBoardLayout
 import kotlinx.coroutines.delay
 
 private enum class PuzzleState { SOLVING, SOLVED, FAILED }
@@ -222,59 +223,57 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        StatBar(rating = rating, streak = streak, bestStreak = bestStreak, solved = solvedCount)
-        Spacer(Modifier.height(8.dp))
-        ModeRow(
-            mode = mode,
-            dueCount = dueNow,
-            onNew = { if (mode != Mode.NEW) enterNew() },
-            onReview = { if (mode != Mode.REVIEW) enterReview() },
-        )
-        if (mode == Mode.NEW) {
-            recommended?.let { theme ->
-                Spacer(Modifier.height(6.dp))
-                Surface(
-                    onClick = { store.recommendedThemes = emptyList(); recommended = null; serve(pickNew()) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                ) {
-                    Text(
-                        "🎯 복기에서 찾은 약점: \"$theme\" — 지금 이 테마를 훈련 중입니다 (탭하면 일반 퍼즐로)",
-                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            WeaknessRow(
-                focus = focusWeakness,
-                onToggle = { focusWeakness = it },
-                weakest = weakest,
-                weakestRate = weakest?.let { store.successRate(it) },
+    ResponsiveBoardLayout(
+        modifier = modifier,
+        top = {
+            StatBar(rating = rating, streak = streak, bestStreak = bestStreak, solved = solvedCount)
+            Spacer(Modifier.height(8.dp))
+            ModeRow(
+                mode = mode,
+                dueCount = dueNow,
+                onNew = { if (mode != Mode.NEW) enterNew() },
+                onReview = { if (mode != Mode.REVIEW) enterReview() },
             )
-        }
-        Spacer(Modifier.height(10.dp))
-        StatusCard(
-            state = state,
-            reviewMode = mode == Mode.REVIEW,
-            theme = puzzle.theme,
-            puzzleRating = puzzle.rating,
-            sideToMove = solverColor,
-            movesLeft = (puzzle.solution.size - step + 1) / 2,
-            failedSan = failedSan,
-        )
-        Spacer(Modifier.height(10.dp))
-
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(520.dp)
+            if (mode == Mode.NEW) {
+                recommended?.let { theme ->
+                    Spacer(Modifier.height(6.dp))
+                    Surface(
+                        onClick = { store.recommendedThemes = emptyList(); recommended = null; serve(pickNew()) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ) {
+                        Text(
+                            "🎯 복기에서 찾은 약점: \"$theme\" — 지금 이 테마를 훈련 중입니다 (탭하면 일반 퍼즐로)",
+                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                WeaknessRow(
+                    focus = focusWeakness,
+                    onToggle = { focusWeakness = it },
+                    weakest = weakest,
+                    weakestRate = weakest?.let { store.successRate(it) },
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            StatusCard(
+                state = state,
+                reviewMode = mode == Mode.REVIEW,
+                theme = puzzle.theme,
+                puzzleRating = puzzle.rating,
+                sideToMove = solverColor,
+                movesLeft = (puzzle.solution.size - step + 1) / 2,
+                failedSan = failedSan,
+            )
+        },
+        board = { m ->
+            BoxWithConstraints(m, contentAlignment = Alignment.Center) {
+                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
                 ChessBoard(
                     position = displayPos,
                     modifier = Modifier.size(side),
@@ -284,21 +283,21 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
                     onSquareClick = if (canMove) ::onSquareClick else null,
                 )
             }
-        }
-
-        Spacer(Modifier.height(10.dp))
-        if (state != PuzzleState.SOLVING) {
-            Button(onClick = ::loadNext) {
-                Text(if (mode == Mode.REVIEW) "다음 복습 →" else "다음 문제 →")
+        },
+        bottom = {
+            if (state != PuzzleState.SOLVING) {
+                Button(onClick = ::loadNext) {
+                    Text(if (mode == Mode.REVIEW) "다음 복습 →" else "다음 문제 →")
+                }
+            } else {
+                Text(
+                    if (step == 0) "기물을 탭해 최선의 수를 두세요" else "좋아요 — 수순을 계속 이어가세요",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-        } else {
-            Text(
-                if (step == 0) "기물을 탭해 최선의 수를 두세요" else "좋아요 — 수순을 계속 이어가세요",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+        },
+    )
 }
 
 @Composable

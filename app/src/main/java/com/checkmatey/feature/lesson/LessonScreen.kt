@@ -41,6 +41,7 @@ import com.checkmatey.core.lesson.Lesson
 import com.checkmatey.core.lesson.Lessons
 import com.checkmatey.data.UserStore
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.components.ResponsiveBoardLayout
 
 /** Endgame drills played against the engine (it defends for real). */
 private data class PracticeDrill(val id: String, val title: String, val subtitle: String, val fen: String)
@@ -205,35 +206,33 @@ private fun LessonDetail(lesson: Lesson, onDone: (String) -> Unit, onBack: () ->
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("← 목록") }
-            Text("${stepIndex + 1} / ${lesson.steps.size}", style = MaterialTheme.typography.labelLarge)
-        }
-        Text(lesson.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(8.dp))
+    val (text, container, onContainer) = when {
+        phase != StepPhase.TRYING -> Triple(step.explain, MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+        wrongMsg != null -> Triple(wrongMsg!!, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
+        else -> Triple(step.instruction, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+    }
 
-        val (text, container, onContainer) = when {
-            phase != StepPhase.TRYING -> Triple(step.explain, MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
-            wrongMsg != null -> Triple(wrongMsg!!, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
-            else -> Triple(step.instruction, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
-        }
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = container, contentColor = onContainer) {
-            Text(
-                text,
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(520.dp)
+    ResponsiveBoardLayout(
+        modifier = modifier,
+        top = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onBack) { Text("← 목록") }
+                Text("${stepIndex + 1} / ${lesson.steps.size}", style = MaterialTheme.typography.labelLarge)
+            }
+            Text(lesson.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = container, contentColor = onContainer) {
+                Text(
+                    text,
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        },
+        board = { m ->
+            BoxWithConstraints(m, contentAlignment = Alignment.Center) {
+                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
                 ChessBoard(
                     position = displayPos,
                     modifier = Modifier.size(side),
@@ -243,22 +242,22 @@ private fun LessonDetail(lesson: Lesson, onDone: (String) -> Unit, onBack: () ->
                     onSquareClick = if (phase == StepPhase.TRYING) ::onSquareClick else null,
                 )
             }
-        }
-
-        Spacer(Modifier.height(10.dp))
-        when (phase) {
-            StepPhase.CORRECT -> Button(onClick = {
-                stepIndex += 1
-                phase = StepPhase.TRYING
-                lastMove = null
-                wrongMsg = null
-            }) { Text("다음 단계 →") }
-            StepPhase.FINISHED -> Button(onClick = { onDone(lesson.id) }) { Text("레슨 완료! ✓") }
-            StepPhase.TRYING -> Text(
-                "기물을 탭해서 지시대로 움직여 보세요",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+        },
+        bottom = {
+            when (phase) {
+                StepPhase.CORRECT -> Button(onClick = {
+                    stepIndex += 1
+                    phase = StepPhase.TRYING
+                    lastMove = null
+                    wrongMsg = null
+                }) { Text("다음 단계 →") }
+                StepPhase.FINISHED -> Button(onClick = { onDone(lesson.id) }) { Text("레슨 완료! ✓") }
+                StepPhase.TRYING -> Text(
+                    "기물을 탭해서 지시대로 움직여 보세요",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+    )
 }

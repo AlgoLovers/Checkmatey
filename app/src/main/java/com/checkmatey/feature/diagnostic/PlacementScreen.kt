@@ -42,6 +42,7 @@ import com.checkmatey.core.puzzle.Puzzle
 import com.checkmatey.core.puzzle.PuzzleRepository
 import com.checkmatey.data.UserStore
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.components.ResponsiveBoardLayout
 import com.checkmatey.ui.components.GradientPrimaryButton
 
 private enum class Phase { SOLVING, ANSWERED, RESULT }
@@ -127,35 +128,38 @@ fun PlacementScreen(onDone: () -> Unit, modifier: Modifier = Modifier) {
         grade(correct)
     }
 
-    Column(
-        modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        if (phase == Phase.RESULT) {
+    if (phase == Phase.RESULT) {
+        Column(
+            modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             ResultView(estimate = estimate, onStart = { finish(apply = true) })
-            return@Column
         }
+        return
+    }
 
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("실력 진단", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("문항 ${index + 1} / ${Placement.LENGTH}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    ResponsiveBoardLayout(
+        modifier = modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+        contentPadding = 20.dp,
+        top = {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("실력 진단", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("문항 ${index + 1} / ${Placement.LENGTH}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = { finish(apply = false) }) { Text("건너뛰기") }
             }
-            TextButton(onClick = { finish(apply = false) }) { Text("건너뛰기") }
-        }
-        Spacer(Modifier.height(8.dp))
-        LinearProgressIndicator(
-            progress = { (index + if (phase == Phase.ANSWERED) 1 else 0).toFloat() / Placement.LENGTH },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(12.dp))
-
-        FeedbackCard(phase = phase, correct = lastCorrect, answerSan = answerSan, sideToMove = solverColor)
-        Spacer(Modifier.height(12.dp))
-
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(520.dp)
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { (index + if (phase == Phase.ANSWERED) 1 else 0).toFloat() / Placement.LENGTH },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
+            FeedbackCard(phase = phase, correct = lastCorrect, answerSan = answerSan, sideToMove = solverColor)
+        },
+        board = { m ->
+            BoxWithConstraints(m, contentAlignment = Alignment.Center) {
+                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
                 ChessBoard(
                     position = displayPos,
                     modifier = Modifier.size(side),
@@ -164,24 +168,24 @@ fun PlacementScreen(onDone: () -> Unit, modifier: Modifier = Modifier) {
                     onSquareClick = if (canMove) ::onSquareClick else null,
                 )
             }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        if (phase == Phase.ANSWERED) {
-            GradientPrimaryButton(onClick = ::next, modifier = Modifier.fillMaxWidth()) {
+        },
+        bottom = {
+            if (phase == Phase.ANSWERED) {
+                GradientPrimaryButton(onClick = ::next, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        if (index + 1 >= Placement.LENGTH) "결과 보기" else "다음 문항 →",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            } else {
                 Text(
-                    if (index + 1 >= Placement.LENGTH) "결과 보기" else "다음 문항 →",
-                    style = MaterialTheme.typography.labelLarge,
+                    "가장 좋은 첫 수를 찾아 기물을 옮겨 보세요",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        } else {
-            Text(
-                "가장 좋은 첫 수를 찾아 기물을 옮겨 보세요",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+        },
+    )
 }
 
 @Composable
