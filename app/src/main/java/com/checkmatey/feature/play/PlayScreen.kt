@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
@@ -272,10 +274,8 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    // Controls above the board (difficulty, status, hint/toggles, gauge, captured pieces).
+    val topControls: @Composable () -> Unit = {
         RatingSelector(selected = if (adaptive) effectiveLevel else level, onSelect = { level = it; adaptive = false })
         if (adaptive) {
             Spacer(Modifier.height(4.dp))
@@ -315,7 +315,6 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             Toggle(label = "소리", on = soundOn, onChange = { soundOn = it; store.soundOn = it })
         }
         Spacer(Modifier.height(8.dp))
-
         // Advantage gauge (full evaluation: material + positioning) + captured pieces, tap for detail.
         val evalCp = remember(position) { engine.evaluate(position) }
         val captured = remember(position) { Material.captured(position) }
@@ -333,11 +332,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        "나: ${captured.byWhite.joinToString("") { Material.glyph(it) }.ifEmpty { "—" }}",
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
+                    Text("나: ${captured.byWhite.joinToString("") { Material.glyph(it) }.ifEmpty { "—" }}", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                     Text(
                         when {
                             captured.diffPawns > 0 -> "+${captured.diffPawns}"
@@ -347,33 +342,31 @@ fun PlayScreen(modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
-                    Text(
-                        "봇: ${captured.byBlack.joinToString("") { Material.glyph(it) }.ifEmpty { "—" }}",
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
+                    Text("봇: ${captured.byBlack.joinToString("") { Material.glyph(it) }.ifEmpty { "—" }}", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                 }
             }
         }
-        Spacer(Modifier.height(6.dp))
+    }
 
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(520.dp)
-                ChessBoard(
-                    position = position,
-                    modifier = Modifier.size(side),
-                    selected = selected,
-                    targets = targets,
-                    lastMove = lastMove,
-                    hintSquares = hintSquares,
-                    onSquareClick = ::onSquareClick,
-                    captureEffect = captureFx,
-                )
-            }
+    // The board, sized to fill whatever space it's given (up to a sane cap on huge screens).
+    val boardArea: @Composable (Modifier) -> Unit = { sizeMod ->
+        BoxWithConstraints(sizeMod, contentAlignment = Alignment.Center) {
+            val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
+            ChessBoard(
+                position = position,
+                modifier = Modifier.size(side),
+                selected = selected,
+                targets = targets,
+                lastMove = lastMove,
+                hintSquares = hintSquares,
+                onSquareClick = ::onSquareClick,
+                captureEffect = captureFx,
+            )
         }
+    }
 
-        // Tutor voice, in priority order: threat warning (before you move) → hint ladder → coach verdict.
+    // Coaching voice below the board (threat → hint ladder → verdict) and the game buttons.
+    val bottomControls: @Composable () -> Unit = {
         if (threats.isNotEmpty() && isHumanTurn && hintStage == 0 && feedback == null) {
             Surface(
                 Modifier.fillMaxWidth(),
@@ -414,6 +407,31 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             OutlinedButton(onClick = ::undo, enabled = moves.isNotEmpty() && !thinking) { Text("↩ 무르기") }
             OutlinedButton(onClick = { reviewing = true }, enabled = moves.isNotEmpty()) { Text("📊 분석") }
             OutlinedButton(onClick = ::newGame) { Text("새 게임") }
+        }
+    }
+
+    // Responsive: on a wide screen (tablet/landscape) the board fills the full height beside a
+    // control panel; on a phone everything stacks and the board takes the space that's left.
+    BoxWithConstraints(modifier.fillMaxSize().padding(16.dp)) {
+        if (maxWidth >= 600.dp) {
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                boardArea(Modifier.weight(1f).fillMaxHeight())
+                Column(
+                    Modifier.width(340.dp).fillMaxHeight().verticalScroll(rememberScrollState()),
+                ) {
+                    topControls()
+                    Spacer(Modifier.height(10.dp))
+                    bottomControls()
+                }
+            }
+        } else {
+            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                topControls()
+                Spacer(Modifier.height(6.dp))
+                boardArea(Modifier.weight(1f).fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                bottomControls()
+            }
         }
     }
 

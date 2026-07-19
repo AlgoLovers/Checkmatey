@@ -1,6 +1,7 @@
 package com.checkmatey
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import com.checkmatey.core.plan.StepTarget
@@ -97,12 +99,16 @@ fun CheckmateyApp() {
     }
 
     // Apply the status bar / cutout / (tablet) rail insets *around* the scaffold, so they aren't
-    // already consumed by the time content is laid out. The bottom nav bar keeps the bottom inset.
-    Box(
+    // already consumed by the time content is laid out.
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
     ) {
+        // NavigationSuiteScaffold shows a BOTTOM BAR on compact width (which consumes the bottom
+        // system inset) but a SIDE RAIL from 600dp up (which does not) — so on tablets the content
+        // ran under the gesture/nav bar. Add the bottom inset to the content only in the rail case.
+        val isRail = maxWidth >= 600.dp
         NavigationSuiteScaffold(
             navigationSuiteItems = {
                 TopDestination.entries.forEach { dest ->
@@ -115,18 +121,26 @@ fun CheckmateyApp() {
                 }
             },
         ) {
-            when (current) {
-                TopDestination.HOME -> HomeScreen(
-                    onGo = ::goTo,
-                    onPlacement = { showPlacement = true },
-                    onSkillTree = { showSkillTree = true },
-                    onDashboard = { showDashboard = true },
-                )
-                TopDestination.LESSONS -> LessonScreen()
-                TopDestination.LEARN -> StudyScreen()
-                TopDestination.PLAY -> PlayScreen()
-                TopDestination.PUZZLES -> PuzzlesScreen()
-                TopDestination.PROFILE -> ProfileScreen()
+            Box(
+                modifier = if (isRail) {
+                    Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                } else {
+                    Modifier
+                },
+            ) {
+                when (current) {
+                    TopDestination.HOME -> HomeScreen(
+                        onGo = ::goTo,
+                        onPlacement = { showPlacement = true },
+                        onSkillTree = { showSkillTree = true },
+                        onDashboard = { showDashboard = true },
+                    )
+                    TopDestination.LESSONS -> LessonScreen()
+                    TopDestination.LEARN -> StudyScreen()
+                    TopDestination.PLAY -> PlayScreen()
+                    TopDestination.PUZZLES -> PuzzlesScreen()
+                    TopDestination.PROFILE -> ProfileScreen()
+                }
             }
         }
     }
