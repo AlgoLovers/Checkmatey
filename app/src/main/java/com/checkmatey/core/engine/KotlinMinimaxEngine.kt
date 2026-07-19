@@ -44,10 +44,16 @@ class KotlinMinimaxEngine : Engine {
         val moves = position.legalMoves()
         if (moves.isEmpty()) return null
         if (moves.size == 1) return moves.first()
-        // Perfect play for the strong levels; softmax sampling for the fallible ones.
+        // Perfect play for the strong levels.
         if (level.blunderChance <= 0.0) return bestMove(position, level.searchDepth)
         val scored = scoredRootMoves(position, level.searchDepth)
         if (scored.isEmpty()) return bestMove(position, level.searchDepth)
+        // Fallible levels play SOLIDLY most of the time (the best move) and only slip occasionally —
+        // a human-like softmax pick with probability [blunderChance]. Sampling on *every* move made
+        // the mid levels feel weak because they never played the best move; this keeps them sharp
+        // while staying beatable and human at the low levels.
+        val best = scored.maxByOrNull { it.second }?.first ?: return bestMove(position, level.searchDepth)
+        if (random.nextDouble() >= level.blunderChance) return best
         return sampleSoftmax(scored, temperatureFor(level), cutoffFor(level), random)
     }
 
