@@ -176,7 +176,9 @@ fun ChessBoard(
                         x = (sq.file + 0.5f) * cellPx,
                         y = (7 - sq.rank + 0.5f) * cellPx,
                     )
-                    val alpha = 1f - p
+                    // Stay fully visible for the first 60% of the animation, then dissolve —
+                    // the point is that the player NOTICES the capture, not just a flicker.
+                    val alpha = ((1f - p) / 0.4f).coerceAtMost(1f)
                     // Main ring.
                     drawCircle(
                         color = Color(0xFFFFC46A).copy(alpha = alpha * 0.85f),
@@ -256,11 +258,11 @@ private data class CaptureTier(
 )
 
 private fun captureTier(piece: PieceType): CaptureTier = when (piece) {
-    PieceType.PAWN -> CaptureTier(durationMs = 280, ringScale = 0.35f, coreAlpha = 0.35f, doubleRing = false, rays = false)
-    PieceType.KNIGHT, PieceType.BISHOP -> CaptureTier(durationMs = 380, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false)
-    PieceType.ROOK -> CaptureTier(durationMs = 470, ringScale = 0.70f, coreAlpha = 0.6f, doubleRing = true, rays = false)
-    PieceType.QUEEN -> CaptureTier(durationMs = 600, ringScale = 0.85f, coreAlpha = 0.75f, doubleRing = true, rays = true)
-    PieceType.KING -> CaptureTier(durationMs = 380, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false)
+    PieceType.PAWN -> CaptureTier(durationMs = 650, ringScale = 0.35f, coreAlpha = 0.35f, doubleRing = false, rays = false)
+    PieceType.KNIGHT, PieceType.BISHOP -> CaptureTier(durationMs = 850, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false)
+    PieceType.ROOK -> CaptureTier(durationMs = 1000, ringScale = 0.70f, coreAlpha = 0.6f, doubleRing = true, rays = false)
+    PieceType.QUEEN -> CaptureTier(durationMs = 1250, ringScale = 0.85f, coreAlpha = 0.75f, doubleRing = true, rays = true)
+    PieceType.KING -> CaptureTier(durationMs = 850, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false)
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawArrow(
