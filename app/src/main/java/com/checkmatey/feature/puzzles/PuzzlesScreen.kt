@@ -37,6 +37,7 @@ import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.chess.TapResult
 import com.checkmatey.core.chess.toSan
+import com.checkmatey.core.daily.DailyPuzzle
 import com.checkmatey.core.puzzle.Puzzle
 import com.checkmatey.core.puzzle.PuzzleRepository
 import com.checkmatey.core.puzzle.Rating
@@ -88,7 +89,12 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     fun freshQueue(): List<String> = Srs.due(srsCards, today).map { it.id }.filter { repo.byId(it) != null }
     var reviewQueue by remember { mutableStateOf(freshQueue()) }
     var reviewPos by remember { mutableIntStateOf(0) }
-    var mode by rememberSaveable { mutableStateOf(if (reviewQueue.isNotEmpty()) Mode.REVIEW else Mode.NEW) }
+    // Puzzle of the day — served first when the home daily card sent us here (one-shot per day).
+    val startDaily = remember {
+        (store.pendingDailyDay == today && store.dailySolvedDay != today).also { if (it) store.pendingDailyDay = 0 }
+    }
+    var servingDaily by remember { mutableStateOf(startDaily) }
+    var mode by rememberSaveable { mutableStateOf(if (!startDaily && reviewQueue.isNotEmpty()) Mode.REVIEW else Mode.NEW) }
     val dueNow = Srs.dueCount(srsCards, today)
 
     fun pickNew(): Puzzle = repo.next(
@@ -102,7 +108,10 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     )
 
     var puzzle by remember {
-        mutableStateOf(reviewQueue.getOrNull(0)?.let { repo.byId(it) } ?: pickNew())
+        mutableStateOf(
+            if (startDaily) DailyPuzzle.forDay(today, repo.all())
+            else reviewQueue.getOrNull(0)?.let { repo.byId(it) } ?: pickNew(),
+        )
     }
     var selected by remember { mutableStateOf<Square?>(null) }
     var state by remember { mutableStateOf(PuzzleState.SOLVING) }
@@ -156,6 +165,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
         if (solved) {
             solvedCount += 1; store.solvedCount = solvedCount
             store.recordSolvedToday(today) // daily goal + day streak
+            if (servingDaily) store.dailySolvedDay = today // puzzle of the day cleared
             streak += 1; store.streak = streak
             if (streak > bestStreak) { bestStreak = streak; store.bestStreak = bestStreak }
             state = PuzzleState.SOLVED
@@ -167,6 +177,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
     }
 
     fun loadNext() {
+        servingDaily = false
         if (mode == Mode.REVIEW) {
             reviewPos += 1
             val nextId = reviewQueue.getOrNull(reviewPos)

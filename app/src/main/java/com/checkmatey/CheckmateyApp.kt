@@ -16,6 +16,7 @@ import com.checkmatey.ui.icons.AppIcons
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import com.checkmatey.core.plan.StepTarget
 import com.checkmatey.data.UserStore
+import com.checkmatey.reminder.DailyReminder
 import com.checkmatey.feature.dashboard.GrowthDashboardScreen
 import com.checkmatey.feature.diagnostic.PlacementScreen
 import com.checkmatey.feature.home.HomeScreen
@@ -59,6 +61,9 @@ private enum class TopDestination(val label: String, val icon: ImageVector) {
 fun CheckmateyApp() {
     val context = LocalContext.current
     val store = remember { UserStore(context) }
+    // Re-arm the daily reminder on every launch (alarms are cleared on reboot / after force-stop);
+    // schedule() is a no-op when the reminder is off.
+    LaunchedEffect(Unit) { DailyReminder.schedule(context) }
     var onboarded by rememberSaveable { mutableStateOf(store.onboardingSeen) }
     if (!onboarded) {
         OnboardingScreen(onDone = { store.onboardingSeen = true; onboarded = true })

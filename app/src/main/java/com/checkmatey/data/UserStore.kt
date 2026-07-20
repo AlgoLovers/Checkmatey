@@ -160,6 +160,28 @@ class UserStore(context: Context) {
     /** The daily state as it should read on [today] (streak lapses / count resets on a new day). */
     fun dailyState(today: Long): DailyState = DailyGoal.viewOn(rawDaily(), today)
 
+    // ---- Daily reminder + puzzle of the day (see core/daily, feature/reminder) ----
+
+    /** Whether the daily practice reminder notification is enabled. */
+    var reminderOn: Boolean
+        get() = prefs.getBoolean(KEY_REMIND_ON, true)
+        set(value) = prefs.edit().putBoolean(KEY_REMIND_ON, value).apply()
+
+    /** Hour of day (0–23) the reminder fires. */
+    var reminderHour: Int
+        get() = prefs.getInt(KEY_REMIND_HOUR, 19)
+        set(value) = prefs.edit().putInt(KEY_REMIND_HOUR, value.coerceIn(0, 23)).apply()
+
+    /** Epoch day handed from Home to the Puzzles tab so it serves the puzzle of the day first (0 = none). */
+    var pendingDailyDay: Long
+        get() = prefs.getLong(KEY_DAILY_PENDING, 0)
+        set(value) = prefs.edit().putLong(KEY_DAILY_PENDING, value).apply()
+
+    /** Epoch day on which the puzzle of the day was last solved (drives the "done ✓" state). */
+    var dailySolvedDay: Long
+        get() = prefs.getLong(KEY_DAILY_SOLVED, 0)
+        set(value) = prefs.edit().putLong(KEY_DAILY_SOLVED, value).apply()
+
     /** Record one solved puzzle for [today]'s goal & streak; returns the updated view. */
     fun recordSolvedToday(today: Long): DailyState =
         DailyGoal.onSolved(rawDaily(), today).also { writeDaily(it) }
@@ -184,5 +206,9 @@ class UserStore(context: Context) {
         const val KEY_DAY_LONGEST = "dayLongest"
         const val KEY_DAY_SOLVED = "daySolved"
         const val KEY_DAY_LAST = "dayLast"
+        const val KEY_REMIND_ON = "reminderOn"
+        const val KEY_REMIND_HOUR = "reminderHour"
+        const val KEY_DAILY_PENDING = "pendingDailyDay"
+        const val KEY_DAILY_SOLVED = "dailySolvedDay"
     }
 }

@@ -4,7 +4,7 @@
 > 계약/런북은 [`LOOP.md`](LOOP.md), 규칙은 [`CLAUDE.md`](CLAUDE.md).
 
 - **성숙도**: L2 (개발 루프는 PR까지 자동, 머지는 사람)
-- **현재 마일스톤**: M1~M48 완료 — 아키텍처 구조화(FSM·Coach) + 감사 백로그 정리(벤치 게이트 분리·feature 독립성·보드 사이징 헬퍼). 게이트 ~4s, 109 테스트.
+- **현재 마일스톤**: M1~M49 완료 — 리텐션(데일리 리마인더 알림 + 오늘의 퍼즐). 프리미엄 결제는 무료 출시 후로 보류. 112 테스트. PR #18(M43~48)·#19(M49) 열림.
 - **트렁크**: 스택 PR 7개를 main에 fast-forward 통합·정리(2026-07-17). 이후 작업은 main에서 분기. 열린 것은 Dependabot 9개(별도 검토).
 
 ## 제품 목표
@@ -254,6 +254,15 @@
       통합, `MaxBoardSide` 상수화, 미사용 Box/BoxWithConstraints import 정리. 109 테스트·APK 빌드.
       · **의도적 유지(백로그 종료)**: 승격 auto-queen(레슨은 acceptUci로 특정 수 요구, 드릴/복기는 무난한 기본값),
       Study 동기 annotate(depth=2 빠름 + guessMode 상호배타로 무레이스), CheckmateyApp 오버레이 3중(경미).
+- [x] **M49 — 리텐션: 데일리 리마인더 알림 + 오늘의 퍼즐(무료 출시용)**: 습관 루프(스트릭·목표)는 M31에 있었지만
+      **다시 돌아올 트리거가 없었음**. ① `reminder/DailyReminder`(+`ReminderReceiver`) — AlarmManager 일일
+      inexact 알람(정확알람 권한 불필요) → 스트릭 인지 알림, 오늘 목표 달성 시 안 울림, 전 경로 크래시 가드.
+      POST_NOTIFICATIONS(13+ 런타임 요청)·RECEIVE_BOOT_COMPLETED(재부팅 재스케줄). ② `core/daily/DailyPuzzle`
+      (순수: epoch-day 결정적 오늘의 퍼즐) + `ReminderTime`(다음 발화까지 ms, 순수) — DailyTest 3. ③ 홈에
+      "🧩 오늘의 퍼즐" 카드(→퍼즐탭이 `pendingDailyDay`로 그 퍼즐 먼저 서빙, 완료 시 ✓) + "🔔 매일 알림" 토글
+      (권한 요청 포함). ④ 앱 시작 시 재스케줄. 112 테스트·린트 0에러·APK 빌드.
+      · **결정**: 프리미엄 결제 게이팅은 **보류**(무료 출시 후 유저 데이터 보고 결정 — 조기 최적화 회피).
+      · **실기기 확인 필요**: 알림 실제 발화/권한 플로우(에뮬 스크린캡 blank라 코드 검증만).
 
 ## 결정 로그 (Decision Log)
 

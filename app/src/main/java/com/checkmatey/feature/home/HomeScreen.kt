@@ -1,5 +1,8 @@
 package com.checkmatey.feature.home
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,14 +17,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.checkmatey.core.habit.DailyGoal
+import com.checkmatey.reminder.DailyReminder
 import com.checkmatey.core.plan.Planner
 import com.checkmatey.core.plan.Progress
 import com.checkmatey.core.plan.StepTarget
@@ -62,6 +70,23 @@ fun HomeScreen(
         dueReviews = store.dueReviewCount(today),
     )
     val step = Planner.next(progress)
+
+    // Daily reminder toggle: on Android 13+ enabling it asks for the notification permission first.
+    var reminderOn by remember { mutableStateOf(store.reminderOn && DailyReminder.hasPermission(context)) }
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        reminderOn = granted
+        store.reminderOn = granted
+        if (granted) DailyReminder.schedule(context) else DailyReminder.cancel(context)
+    }
+    fun toggleReminder(on: Boolean) {
+        if (on && !DailyReminder.hasPermission(context)) {
+            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            reminderOn = on
+            store.reminderOn = on
+            if (on) DailyReminder.schedule(context) else DailyReminder.cancel(context)
+        }
+    }
 
     Column(
         modifier
@@ -127,6 +152,51 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+        }
+
+        // Puzzle of the day — one shared tactic, tapped from here into the Puzzles tab.
+        val dailyDone = store.dailySolvedDay == today
+        Spacer(Modifier.height(12.dp))
+        Surface(
+            onClick = { store.pendingDailyDay = today; onGo(StepTarget.PUZZLE) },
+            Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text("🧩", style = MaterialTheme.typography.headlineSmall)
+                Column(Modifier.weight(1f)) {
+                    Text("오늘의 퍼즐", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        if (dailyDone) "✓ 오늘의 퍼즐 완료 — 내일 또 만나요" else "매일 새로운 한 문제로 감각을 유지해요",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(if (dailyDone) "✓" else "풀기 →", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+
+        // Reminder — the trigger that brings the player back each day (the retention lever).
+        val h = store.reminderHour
+        val timeLabel = if (h < 12) "오전 ${if (h == 0) 12 else h}시" else "오후 ${if (h == 12) 12 else h - 12}시"
+        Spacer(Modifier.height(12.dp))
+        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 18.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("🔔 매일 학습 알림", style = MaterialTheme.typography.titleSmall)
+                    Text("$timeLabel 에 오늘의 퍼즐을 알려드려요", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = reminderOn, onCheckedChange = { toggleReminder(it) })
             }
         }
 
