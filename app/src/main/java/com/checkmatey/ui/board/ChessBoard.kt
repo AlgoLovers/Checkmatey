@@ -179,12 +179,22 @@ fun ChessBoard(
                     // Stay fully visible for the first 60% of the animation, then dissolve —
                     // the point is that the player NOTICES the capture, not just a flicker.
                     val alpha = ((1f - p) / 0.4f).coerceAtMost(1f)
-                    // Main ring.
+                    // Impact flash: a bright filled disc that expands and fades in the first half, so
+                    // the capture LANDS with a punch instead of only outlining a ring.
+                    val flash = ((0.5f - p) / 0.5f).coerceAtLeast(0f)
+                    if (flash > 0f) {
+                        drawCircle(
+                            color = Color(0xFFFFE2A6).copy(alpha = flash * 0.5f),
+                            radius = cellPx * (0.22f + tier.ringScale * 0.9f * p),
+                            center = center,
+                        )
+                    }
+                    // Main ring — thick and bright so it reads as an explosion, not a hairline.
                     drawCircle(
-                        color = Color(0xFFFFC46A).copy(alpha = alpha * 0.85f),
+                        color = Color(0xFFFFC46A).copy(alpha = alpha * 0.9f),
                         radius = cellPx * (0.15f + tier.ringScale * p),
                         center = center,
-                        style = Stroke(width = cellPx * 0.10f * (1f - 0.6f * p)),
+                        style = Stroke(width = cellPx * 0.15f * (1f - 0.55f * p)),
                     )
                     // Bright core flash.
                     drawCircle(
@@ -275,11 +285,11 @@ private data class CaptureTier(
 )
 
 private fun captureTier(piece: PieceType): CaptureTier = when (piece) {
-    PieceType.PAWN -> CaptureTier(650, ringScale = 0.35f, coreAlpha = 0.35f, doubleRing = false, rays = false, particles = 5)
-    PieceType.KNIGHT, PieceType.BISHOP -> CaptureTier(850, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false, particles = 9)
-    PieceType.ROOK -> CaptureTier(1000, ringScale = 0.70f, coreAlpha = 0.6f, doubleRing = true, rays = false, particles = 13)
-    PieceType.QUEEN -> CaptureTier(1250, ringScale = 0.85f, coreAlpha = 0.75f, doubleRing = true, rays = true, particles = 18)
-    PieceType.KING -> CaptureTier(850, ringScale = 0.55f, coreAlpha = 0.5f, doubleRing = false, rays = false, particles = 9)
+    PieceType.PAWN -> CaptureTier(600, ringScale = 0.55f, coreAlpha = 0.55f, doubleRing = false, rays = false, particles = 9)
+    PieceType.KNIGHT, PieceType.BISHOP -> CaptureTier(780, ringScale = 0.90f, coreAlpha = 0.70f, doubleRing = true, rays = false, particles = 16)
+    PieceType.ROOK -> CaptureTier(900, ringScale = 1.15f, coreAlpha = 0.80f, doubleRing = true, rays = false, particles = 22)
+    PieceType.QUEEN -> CaptureTier(1100, ringScale = 1.40f, coreAlpha = 0.95f, doubleRing = true, rays = true, particles = 30)
+    PieceType.KING -> CaptureTier(780, ringScale = 0.90f, coreAlpha = 0.70f, doubleRing = true, rays = false, particles = 16)
 }
 
 // Warm confetti palette for the shards — reads as celebratory, not clinical.

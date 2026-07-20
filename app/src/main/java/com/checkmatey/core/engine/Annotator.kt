@@ -1,10 +1,12 @@
 package com.checkmatey.core.engine
 
+import com.checkmatey.core.chess.Material
 import com.checkmatey.core.chess.Move
 import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.PieceType
 import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
+import com.checkmatey.core.chess.koreanName
 import com.checkmatey.core.chess.toSan
 
 private val ROOK_DIRS = arrayOf(intArrayOf(1, 0), intArrayOf(-1, 0), intArrayOf(0, 1), intArrayOf(0, -1))
@@ -101,14 +103,14 @@ class Annotator(private val engine: Engine, private val depth: Int = 4) {
 
         val parts = mutableListOf<String>()
         if (move.isCastleKingSide || move.isCastleQueenSide) parts += "캐슬링으로 킹을 안전하게 하고 룩을 전개합니다"
-        if (move.promotion != null) parts += "${pieceName(move.promotion)}(으)로 승격합니다"
+        if (move.promotion != null) parts += "${move.promotion.koreanName()}(으)로 승격합니다"
 
         val captured = before.pieceAt(move.to)?.type ?: if (move.isEnPassant) PieceType.PAWN else null
         if (captured != null) {
             // Free if the enemy can't recapture on the landing square.
             val free = !after.isSquareAttacked(move.to, enemy)
-            parts += if (free) "${move.to.name}의 ${pieceName(captured)}을(를) 공짜로 잡습니다"
-            else "${move.to.name}의 ${pieceName(captured)}을(를) 잡습니다"
+            parts += if (free) "${move.to.name}의 ${captured.koreanName()}을(를) 공짜로 잡습니다"
+            else "${move.to.name}의 ${captured.koreanName()}을(를) 잡습니다"
         }
 
         if (forkCount(after, move.to) >= 2) parts += "한 수로 두 기물 이상을 동시에 노립니다 (포크)"
@@ -193,7 +195,7 @@ class Annotator(private val engine: Engine, private val depth: Int = 4) {
                 best = sq to target.type
             }
         }
-        return best?.let { "다음 수로 ${it.first.name}의 ${pieceName(it.second)}을(를) 노립니다" }
+        return best?.let { "다음 수로 ${it.first.name}의 ${it.second.koreanName()}을(를) 노립니다" }
     }
 
     private fun findKing(pos: Position, color: PieceColor): Square? {
@@ -204,13 +206,10 @@ class Annotator(private val engine: Engine, private val depth: Int = 4) {
         return null
     }
 
-    private fun pieceValue(type: PieceType): Int = when (type) {
-        PieceType.PAWN -> 1
-        PieceType.KNIGHT, PieceType.BISHOP -> 3
-        PieceType.ROOK -> 5
-        PieceType.QUEEN -> 9
-        PieceType.KING -> 100
-    }
+    // Trade value for threat comparisons: the shared pawn scale, but the king is an infinite
+    // sentinel (you never "win a trade" by attacking with, or capturing, the king).
+    private fun pieceValue(type: PieceType): Int =
+        if (type == PieceType.KING) 100 else Material.pawnValue(type)
 
     /** Positional idea when a move makes no immediate tactic — a small, level-appropriate plan. */
     private fun positionalReason(before: Position, move: Move): String {
@@ -231,13 +230,4 @@ class Annotator(private val engine: Engine, private val depth: Int = 4) {
     /** No pawns of either colour on [file] — a rook there works at full range. */
     private fun isOpenFile(pos: Position, file: Int): Boolean =
         (0..7).none { rank -> pos.pieceAt(file, rank)?.type == PieceType.PAWN }
-
-    private fun pieceName(type: PieceType): String = when (type) {
-        PieceType.PAWN -> "폰"
-        PieceType.KNIGHT -> "나이트"
-        PieceType.BISHOP -> "비숍"
-        PieceType.ROOK -> "룩"
-        PieceType.QUEEN -> "퀸"
-        PieceType.KING -> "킹"
-    }
 }

@@ -4,6 +4,7 @@ import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.PieceType
 import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
+import com.checkmatey.core.chess.koreanName
 
 /** A danger the opponent is threatening right now, worth warning the student about. */
 data class Threat(val square: Square, val piece: PieceType, val text: String, val severity: Int)
@@ -43,7 +44,7 @@ object Tutor {
             val value = Evaluation.value(p.type)
             if (!defended || cheapest < value) {
                 val how = if (!defended) "무방비예요" else "더 싼 기물로 노리고 있어요"
-                found += Threat(sq, p.type, "⚠️ ${sq.name}의 ${koreanName(p.type)}이(가) 위험해요 — $how", value)
+                found += Threat(sq, p.type, "⚠️ ${sq.name}의 ${p.type.koreanName()}이(가) 위험해요 — $how", value)
             }
         }
         return found.sortedByDescending { it.severity }.take(2)
@@ -99,7 +100,7 @@ object Tutor {
             else -> "가장 일을 안 하고 있는 기물을 찾아 보세요 — 그 기물에게 더 좋은 자리가 있어요."
         }
         val piece = position.pieceAt(hint.move.from)
-        val pieceLine = "움직일 기물: ${piece?.type?.let(::koreanName) ?: "?"} (${hint.move.from.name})"
+        val pieceLine = "움직일 기물: ${piece?.type?.koreanName() ?: "?"} (${hint.move.from.name})"
         val answer = "${hint.san} — ${hint.reason}"
         return listOf(question, pieceLine, answer)
     }
@@ -123,14 +124,5 @@ object Tutor {
     fun recallLine(theme: String, attempts: Int, successRate: Int): String? {
         if (attempts < 3 || successRate > 50) return null
         return "📌 \"$theme\" 유형이 자꾸 발목을 잡네요 (성공률 $successRate%) — 퍼즐 탭에서 이 테마를 집중 훈련하면 바로 좋아져요."
-    }
-
-    private fun koreanName(type: PieceType): String = when (type) {
-        PieceType.PAWN -> "폰"
-        PieceType.KNIGHT -> "나이트"
-        PieceType.BISHOP -> "비숍"
-        PieceType.ROOK -> "룩"
-        PieceType.QUEEN -> "퀸"
-        PieceType.KING -> "킹"
     }
 }

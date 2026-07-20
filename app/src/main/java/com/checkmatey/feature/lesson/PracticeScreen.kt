@@ -1,8 +1,6 @@
 package com.checkmatey.feature.lesson
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,11 +29,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.checkmatey.core.chess.Move
+import com.checkmatey.core.chess.MoveSelection
+import com.checkmatey.core.chess.TapResult
 import com.checkmatey.core.chess.PieceType
 import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.board.SquareBoardBox
 import com.checkmatey.ui.components.ResponsiveBoardLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -94,22 +95,15 @@ fun PracticeScreen(drillId: String, title: String, startFen: String, onBack: () 
 
     fun onSquareClick(square: Square) {
         if (!isHumanTurn) return
-        val current = selected
-        if (current == null) {
-            if (position.pieceAt(square)?.color == humanColor) selected = square
-            return
-        }
-        if (square == current) {
-            selected = null
-            return
-        }
-        val candidates = position.legalMoves().filter { it.from == current && it.to == square }
-        val move = candidates.firstOrNull { it.promotion == null } ?: candidates.firstOrNull { it.promotion == PieceType.QUEEN }
-        if (move != null) {
-            applyMove(move)
-            selected = null
-        } else {
-            selected = if (position.pieceAt(square)?.color == humanColor) square else null
+        when (val r = MoveSelection.onTap(position, selected, square, humanColor)) {
+            is TapResult.Select -> selected = r.square
+            TapResult.Clear -> selected = null
+            TapResult.Ignore -> {}
+            is TapResult.Moves -> {
+                selected = null
+                val move = r.candidates.firstOrNull { it.promotion == null } ?: r.candidates.first { it.promotion == PieceType.QUEEN }
+                applyMove(move)
+            }
         }
     }
 
@@ -143,8 +137,7 @@ fun PracticeScreen(drillId: String, title: String, startFen: String, onBack: () 
             }
         },
         board = { m ->
-            BoxWithConstraints(m, contentAlignment = Alignment.Center) {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
+            SquareBoardBox(m) { side ->
                 ChessBoard(
                     position = position,
                     modifier = Modifier.size(side),

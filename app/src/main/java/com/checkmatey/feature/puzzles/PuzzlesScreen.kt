@@ -2,8 +2,6 @@ package com.checkmatey.feature.puzzles
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,18 +32,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.checkmatey.core.chess.Move
+import com.checkmatey.core.chess.MoveSelection
 import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.Square
+import com.checkmatey.core.chess.TapResult
 import com.checkmatey.core.chess.toSan
 import com.checkmatey.core.puzzle.Puzzle
 import com.checkmatey.core.puzzle.PuzzleRepository
 import com.checkmatey.core.puzzle.Rating
 import com.checkmatey.core.srs.Grade
 import com.checkmatey.core.srs.Srs
+import com.checkmatey.data.PuzzleAssets
 import com.checkmatey.data.UserStore
 import com.checkmatey.sound.Sfx
 import com.checkmatey.sound.SoundFx
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.board.SquareBoardBox
 import com.checkmatey.ui.components.ResponsiveBoardLayout
 import kotlinx.coroutines.delay
 
@@ -65,7 +67,7 @@ private enum class Mode { NEW, REVIEW }
 fun PuzzlesScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val store = remember { UserStore(context) }
-    val repo = remember { PuzzleRepository(context) }
+    val repo = remember { PuzzleRepository(PuzzleAssets.load(context)) }
     val haptic = LocalHapticFeedback.current
     val soundFx = remember { SoundFx() }
     val today = remember { System.currentTimeMillis() / 86_400_000L }
@@ -195,31 +197,28 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
 
     fun onSquareClick(square: Square) {
         if (!canMove) return
-        val current = selected
-        if (current == null) {
-            if (displayPos.pieceAt(square)?.color == solverColor) selected = square
-            return
-        }
-        if (square == current) { selected = null; return }
-        val move = displayPos.legalMoves().firstOrNull { it.from == current && it.to == square }
-        if (move == null) {
-            selected = if (displayPos.pieceAt(square)?.color == solverColor) square else null
-            return
-        }
-        selected = null
-        val expected = displayPos.findMove(puzzle.solution[step]) ?: return
-        val correct = move.from == expected.from && move.to == expected.to
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        if (correct) {
-            displayPos = displayPos.applyMove(expected)
-            lastMove = expected
-            step += 1
-            if (step >= puzzle.solution.size) finish(solved = true) else awaitingReply = true
-        } else {
-            failedSan = displayPos.toSan(expected)
-            displayPos = displayPos.applyMove(expected)
-            lastMove = expected
-            finish(solved = false)
+        when (val r = MoveSelection.onTap(displayPos, selected, square, solverColor)) {
+            is TapResult.Select -> selected = r.square
+            TapResult.Clear -> selected = null
+            TapResult.Ignore -> {}
+            is TapResult.Moves -> {
+                selected = null
+                // Any candidate shares the tapped from→to, which is all grading compares.
+                val correct = puzzle.isSolverMove(step, r.candidates.first())
+                val expected = displayPos.findMove(puzzle.solution[step]) ?: return
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                if (correct) {
+                    displayPos = displayPos.applyMove(expected)
+                    lastMove = expected
+                    step += 1
+                    if (step >= puzzle.solution.size) finish(solved = true) else awaitingReply = true
+                } else {
+                    failedSan = displayPos.toSan(expected)
+                    displayPos = displayPos.applyMove(expected)
+                    lastMove = expected
+                    finish(solved = false)
+                }
+            }
         }
     }
 
@@ -272,8 +271,7 @@ fun PuzzlesScreen(modifier: Modifier = Modifier) {
             )
         },
         board = { m ->
-            BoxWithConstraints(m, contentAlignment = Alignment.Center) {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
+            SquareBoardBox(m) { side ->
                 ChessBoard(
                     position = displayPos,
                     modifier = Modifier.size(side),

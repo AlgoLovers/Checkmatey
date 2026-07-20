@@ -1,8 +1,6 @@
 package com.checkmatey.feature.study
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,7 +32,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.checkmatey.core.chess.MoveSelection
 import com.checkmatey.core.chess.PieceColor
+import com.checkmatey.core.chess.TapResult
 import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.engine.Annotator
@@ -42,6 +42,7 @@ import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.core.study.StudyGame
 import com.checkmatey.core.study.StudyGames
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.board.SquareBoardBox
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -133,33 +134,27 @@ private fun GameDetail(game: StudyGame, onBack: () -> Unit, modifier: Modifier) 
 
     fun onGuess(square: Square) {
         val next = actualNext ?: return
-        val current = selected
-        if (current == null) {
-            if (position.pieceAt(square)?.color == position.sideToMove) selected = square
-            return
+        when (val r = MoveSelection.onTap(position, selected, square, position.sideToMove)) {
+            is TapResult.Select -> selected = r.square
+            TapResult.Clear -> selected = null
+            TapResult.Ignore -> {}
+            is TapResult.Moves -> {
+                selected = null
+                val legal = r.candidates.first()
+                attempts++
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                val guessedRight = legal.from == next.from && legal.to == next.to
+                val playedSan = game.sans.getOrNull(ply) ?: ""
+                val why = annotator.annotate(position, next).reason
+                feedback = if (guessedRight) {
+                    correct++
+                    "정답! ✓  $playedSan — $why"
+                } else {
+                    "아쉬워요 — 실제 수는 $playedSan: $why"
+                }
+                ply += 1 // reveal the real move (board animates it)
+            }
         }
-        if (square == current) {
-            selected = null
-            return
-        }
-        val legal = position.legalMoves().firstOrNull { it.from == current && it.to == square }
-        if (legal == null) {
-            selected = if (position.pieceAt(square)?.color == position.sideToMove) square else null
-            return
-        }
-        selected = null
-        attempts++
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        val guessedRight = legal.from == next.from && legal.to == next.to
-        val playedSan = game.sans.getOrNull(ply) ?: ""
-        val why = annotator.annotate(position, next).reason
-        feedback = if (guessedRight) {
-            correct++
-            "정답! ✓  $playedSan — $why"
-        } else {
-            "아쉬워요 — 실제 수는 $playedSan: $why"
-        }
-        ply += 1 // reveal the real move (board animates it)
     }
 
     Column(
@@ -179,18 +174,15 @@ private fun GameDetail(game: StudyGame, onBack: () -> Unit, modifier: Modifier) 
         StatusCard(game = game, ply = ply, guessMode = guessMode, position = position, feedback = feedback ?: whyText)
         Spacer(Modifier.height(10.dp))
 
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
-                ChessBoard(
-                    position = position,
-                    modifier = Modifier.size(side),
-                    selected = if (guessMode) selected else null,
-                    targets = targets,
-                    lastMove = lastMove,
-                    onSquareClick = if (guessMode && actualNext != null) ::onGuess else null,
-                )
-            }
+        SquareBoardBox(Modifier.weight(1f).fillMaxWidth()) { side ->
+            ChessBoard(
+                position = position,
+                modifier = Modifier.size(side),
+                selected = if (guessMode) selected else null,
+                targets = targets,
+                lastMove = lastMove,
+                onSquareClick = if (guessMode && actualNext != null) ::onGuess else null,
+            )
         }
 
         Spacer(Modifier.height(10.dp))

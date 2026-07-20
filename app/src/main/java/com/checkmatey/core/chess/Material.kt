@@ -50,6 +50,9 @@ object Material {
         return CapturedPieces(byWhite, byBlack, diff)
     }
 
+    /** Classic point value in pawns (P1 N/B3 R5 Q9; king 0) — the one shared material scale. */
+    fun pawnValue(type: PieceType): Int = PAWNS[type] ?: 0
+
     /** Board glyph for a captured piece (black glyphs read best at small sizes). */
     fun glyph(type: PieceType): String = when (type) {
         PieceType.PAWN -> "♟"

@@ -13,7 +13,19 @@ enum class Sfx {
     // Capture tiers — a heftier "thunk" the bigger the piece you took.
     CAPTURE_PAWN, CAPTURE_MINOR, CAPTURE_ROOK, CAPTURE_QUEEN,
     // Puzzle trainer feedback (the puzzles tab used to be silent).
-    CORRECT, WRONG, LEVEL_UP,
+    CORRECT, WRONG, LEVEL_UP;
+
+    companion object {
+        /** The capture sound matching a captured piece's FEN letter — pure, so callers without a
+         *  [SoundFx] instance (e.g. the shared move-feedback helper) can pick the tier too. */
+        fun forCapture(pieceLetter: Char): Sfx = when (pieceLetter.lowercaseChar()) {
+            'p' -> CAPTURE_PAWN
+            'n', 'b' -> CAPTURE_MINOR
+            'r' -> CAPTURE_ROOK
+            'q' -> CAPTURE_QUEEN
+            else -> CAPTURE
+        }
+    }
 }
 
 /**
@@ -44,13 +56,7 @@ class SoundFx {
     )
 
     /** The capture sound matching a captured piece — pairs with the board's tiered visual. */
-    fun captureFor(pieceLetter: Char): Sfx = when (pieceLetter.lowercaseChar()) {
-        'p' -> Sfx.CAPTURE_PAWN
-        'n', 'b' -> Sfx.CAPTURE_MINOR
-        'r' -> Sfx.CAPTURE_ROOK
-        'q' -> Sfx.CAPTURE_QUEEN
-        else -> Sfx.CAPTURE
-    }
+    fun captureFor(pieceLetter: Char): Sfx = Sfx.forCapture(pieceLetter)
 
     fun play(sfx: Sfx) {
         val pcm = samples[sfx] ?: return

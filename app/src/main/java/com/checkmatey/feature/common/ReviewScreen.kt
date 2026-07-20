@@ -1,8 +1,6 @@
-package com.checkmatey.feature.review
+package com.checkmatey.feature.common
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,12 +27,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.checkmatey.core.chess.Move
+import com.checkmatey.core.chess.MoveSelection
 import com.checkmatey.core.chess.PieceColor
 import com.checkmatey.core.chess.Position
+import com.checkmatey.core.chess.TapResult
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.engine.Annotator
 import com.checkmatey.core.engine.BotLevel
@@ -43,8 +45,14 @@ import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.core.engine.MoveAnnotation
 import com.checkmatey.core.engine.MoveQuality
 import com.checkmatey.core.study.StudyGame
-import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.sound.SoundFx
 import com.checkmatey.ui.board.BoardArrow
+import com.checkmatey.ui.board.CaptureCallout
+import com.checkmatey.ui.board.CaptureFx
+import com.checkmatey.ui.board.CaptureNote
+import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.board.SquareBoardBox
+import com.checkmatey.ui.board.moveFeedback
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -117,8 +125,22 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
         var retryFeedback by remember { mutableStateOf<MoveAnnotation?>(null) }
         var retryFirstDone by remember { mutableStateOf(false) }
         var retryPlayerColor by remember { mutableStateOf(mySide) }
+        var retryCaptureFx by remember { mutableStateOf<CaptureFx?>(null) }
+        var retryCaptureNote by remember { mutableStateOf<CaptureNote?>(null) }
         val scope = rememberCoroutineScope()
         val retryEngine = remember { KotlinMinimaxEngine() }
+        // Playing it out should feel like the real Play tab — same sound, capture pop, and haptic.
+        val soundFx = remember { SoundFx() }
+        val haptic = LocalHapticFeedback.current
+
+        // Sound + capture pop + named callout for a move about to be applied from [before] — the same
+        // shared feedback the Play tab uses, so playing it out here feels identical.
+        fun playRetryFx(before: Position, move: Move) {
+            val fx = moveFeedback(before, move, retryPlayerColor, retryCaptureFx?.counter ?: 0)
+            fx.capture?.let { retryCaptureFx = it }
+            fx.note?.let { retryCaptureNote = it }
+            if (store.soundOn) soundFx.play(fx.sfx)
+        }
 
         fun startRetry() {
             val base = game.positionAt(ply - 1)
@@ -128,6 +150,8 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
             retryLast = null
             retryFeedback = null
             retryFirstDone = false
+            retryCaptureFx = null
+            retryCaptureNote = null
             retryMode = true
         }
 
@@ -153,7 +177,7 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
                     val mv = withContext(Dispatchers.Default) {
                         retryEngine.chooseMove(p, BotLevel.forRating(store.puzzleRating), Random.Default)
                     }
-                    if (mv != null && retryMode) { retryLast = mv; retryPos = p.applyMove(mv) }
+                    if (mv != null && retryMode) { playRetryFx(p, mv); retryLast = mv; retryPos = p.applyMove(mv) }
                 }
             }
 
@@ -177,40 +201,37 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
 
             fun onRetryClick(square: Square) {
                 if (!myTurn) return
-                val current = retrySelected
-                if (current == null) {
-                    if (pos.pieceAt(square)?.color == retryPlayerColor) retrySelected = square
-                    return
+                when (val r = MoveSelection.onTap(pos, retrySelected, square, retryPlayerColor)) {
+                    is TapResult.Select -> retrySelected = r.square
+                    TapResult.Clear -> retrySelected = null
+                    TapResult.Ignore -> {}
+                    is TapResult.Moves -> {
+                        retrySelected = null
+                        val move = r.candidates.firstOrNull { it.promotion == null } ?: r.candidates.first()
+                        if (!retryFirstDone) {
+                            val base = pos
+                            scope.launch { retryFeedback = withContext(Dispatchers.Default) { annotator.annotate(base, move) } }
+                            retryFirstDone = true
+                        }
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        playRetryFx(pos, move)
+                        retryLast = move
+                        retryPos = pos.applyMove(move)
+                    }
                 }
-                if (square == current) { retrySelected = null; return }
-                val candidates = pos.legalMoves().filter { it.from == current && it.to == square }
-                val move = candidates.firstOrNull { it.promotion == null } ?: candidates.firstOrNull()
-                if (move == null) {
-                    retrySelected = if (pos.pieceAt(square)?.color == retryPlayerColor) square else null
-                    return
-                }
-                retrySelected = null
-                if (!retryFirstDone) {
-                    val base = pos
-                    scope.launch { retryFeedback = withContext(Dispatchers.Default) { annotator.annotate(base, move) } }
-                    retryFirstDone = true
-                }
-                retryLast = move
-                retryPos = pos.applyMove(move)
             }
 
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                BoxWithConstraints {
-                    val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
-                    ChessBoard(
-                        position = pos,
-                        modifier = Modifier.size(side),
-                        selected = retrySelected,
-                        targets = targets,
-                        lastMove = retryLast,
-                        onSquareClick = if (myTurn) ::onRetryClick else null,
-                    )
-                }
+            SquareBoardBox(Modifier.weight(1f).fillMaxWidth()) { side ->
+                ChessBoard(
+                    position = pos,
+                    modifier = Modifier.size(side),
+                    selected = retrySelected,
+                    targets = targets,
+                    lastMove = retryLast,
+                    captureEffect = retryCaptureFx,
+                    onSquareClick = if (myTurn) ::onRetryClick else null,
+                )
+                CaptureCallout(retryCaptureNote, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -255,16 +276,13 @@ fun ReviewScreen(game: StudyGame, mySide: PieceColor, onBack: () -> Unit, modifi
             list
         }
 
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BoxWithConstraints {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
-                ChessBoard(
-                    position = game.positionAt(ply),
-                    modifier = Modifier.size(side),
-                    lastMove = if (ply > 0) game.moveAt(ply - 1) else null,
-                    arrows = arrows,
-                )
-            }
+        SquareBoardBox(Modifier.weight(1f).fillMaxWidth()) { side ->
+            ChessBoard(
+                position = game.positionAt(ply),
+                modifier = Modifier.size(side),
+                lastMove = if (ply > 0) game.moveAt(ply - 1) else null,
+                arrows = arrows,
+            )
         }
 
         // Legend so the colours are self-explanatory.

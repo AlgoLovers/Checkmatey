@@ -4,7 +4,7 @@
 > 계약/런북은 [`LOOP.md`](LOOP.md), 규칙은 [`CLAUDE.md`](CLAUDE.md).
 
 - **성숙도**: L2 (개발 루프는 PR까지 자동, 머지는 사람)
-- **현재 마일스톤**: M1~M42 완료 — 봇 기력 정상화(중급+ 최선수 위주). 라벨별 ELO 미세조정은 피드백 대기.
+- **현재 마일스톤**: M1~M48 완료 — 아키텍처 구조화(FSM·Coach) + 감사 백로그 정리(벤치 게이트 분리·feature 독립성·보드 사이징 헬퍼). 게이트 ~4s, 109 테스트.
 - **트렁크**: 스택 PR 7개를 main에 fast-forward 통합·정리(2026-07-17). 이후 작업은 main에서 분기. 열린 것은 Dependabot 9개(별도 검토).
 
 ## 제품 목표
@@ -213,6 +213,47 @@
       샘플링**으로 바꿔 중급 이상이 최선수를 한 번도 안 두게 된 게 원인(과약화). **하이브리드로 수정** —
       `blunderChance` 확률로만 사람같은 슬립, 나머지는 최선수. `BotStrengthTest`(평균 cp손실 측정) 신설:
       새싹 82 / 초급 31 / **중급 0 / 도전 0** cp — 중급 이상이 전술을 놓치거나 기물을 흘리지 않음. 100 테스트.
+- [x] **M43 — 코치 채점 동시성 버그 수정(사용자 "힌트 준 수가 빨간색으로 나온다")**: 원인 = **엔진 인스턴스
+      공유 레이스**. `KotlinMinimaxEngine`은 탐색 상태를 필드에 두는 "한 번에 한 탐색"용인데, Play 화면에서
+      **봇의 `chooseMove`**와 **코치의 `annotate`**가 수를 둔 직후 `Dispatchers.Default`에서 **동시에 같은
+      엔진**을 돌려 코치 탐색이 오염 → 코치가 찾은 최선수가 힌트와 달라짐 → 힌트 수가 `isBest=false`로 빨간
+      채점(간헐적). **수정**: 코치에 **전용 엔진 인스턴스** + `Mutex`(hint/annotate 직렬화)로 공유 상태 제거.
+      회귀 테스트 `theHintedMoveIsNeverGradedAnythingButBest`(4국면에서 힌트 수 = BEST 불변식 고정). 101 테스트.
+- [x] **M44 — 리뷰 이어두기 손맛 + 캡처 이펙트 강화(사용자 피드백)**: ① 복기 "🔁 이 국면부터 둬보기"의
+      플레이어 수·엔진 응수에 **사운드·캡처 팝·햅틱이 전혀 없던** 것 → PlayScreen과 동일 배선(`playRetryFx`:
+      victim 감지→CaptureFx+체크/메이트/캡처/이동 사운드, 플레이어 수엔 햅틱). ReviewScreen 리트라이 보드에
+      `captureEffect` 전달. ② 캡처 이펙트 **체감 강화** — 전 티어 ringScale↑(퀸 0.85→1.40)·파티클↑(퀸 18→30)·
+      coreAlpha↑·나이트 이상 doubleRing, **임팩트 플래시 디스크**(전반 50% 밝게 확산)+링 두께 0.10→0.15.
+      101 테스트 통과·APK 빌드. · 참고: 힌트는 **레이팅 무관 최강수**(`bestMove` depth 4) — 레벨 맞춤은 미정.
+- [x] **M45 — 캡처 콜아웃(어떤 말이 잡혔는지, 사용자 요청)**: 캡처 팝은 값 크기만 색/파티클로 보여줄 뿐
+      **어떤 기물인지 이름을 안 알려줬음**. `ui/board/CaptureCallout`(`CaptureNote(piece, byMe, counter)`)
+      — 보드 상단에 뜨는 칩: 내가 잡으면 "♞ 상대 나이트 획득! +3"(초록), 뺏기면 "♝ 내 비숍을 내줬어요 −3"(코랄),
+      1.4s 후 페이드. PlayScreen·ReviewScreen 리트라이에 배선(mover 색으로 byMe 판정, TopCenter 오버레이).
+      101 테스트·APK 빌드. · 퍼즐은 멀티무브 자동재생 노이즈 우려로 제외.
+- [x] **M46 — 품질 패스(리뷰: 가이드·완성도·재사용, 사용자 요청)**: 서브에이전트 감사 + 직접 리팩터.
+      **구조적 위반 2건 해소**: ① `core/puzzle`가 Android(`Context`)에 의존 → 순수화(`Puzzle.parse`/`PuzzleRepository(List)`),
+      에셋 로드는 `data/PuzzleAssets`로 이동(JVM 테스트 가능) ② 3회 반복 규칙이 UI에 있던 것 → `core/chess/Repetition`
+      (+RepetitionTest 2). **재사용**: `PieceType.koreanName()`·`Material.pawnValue`·`Sfx.forCapture`(순수) 신설로
+      한글명 3중·가치 맵·글리프 중복 제거, 공유 `ui/board/moveFeedback`로 Play/Review 캡처+사운드 FX 블록 통합,
+      CaptureCallout이 Material.glyph/value 재사용. **완성도**: `Puzzle.isSolverMove`(순수 채점, 두 화면 공유+테스트),
+      데드코드 제거(InfoScreen·firstMoveUci·promotionName 축약). 104 테스트 전부 통과·APK 빌드.
+      · **백로그(감사 지적, 미착수)**: 벤치 테스트 게이트 분리(#3), review 화면 feature 결합도(#4), 승격 선택 재사용(#5),
+      탭-이동 FSM 공유 헬퍼(#8→M47 완료), 보드 사이징 헬퍼(#9), 오버레이 배선(#11) — 다수 UI 파일 수정이라 실기기 검증 후 진행 권장.
+- [x] **M47 — 아키텍처 구조화(반복 중복 + 오류 잦은 로직, 사용자 요청)**: 땜질이 아니라 구조로.
+      ① **탭-이동 FSM**: 7개 화면(Play·Puzzles·Placement·Lesson·Practice·Study·Review리트라이)에 복붙된 선택
+      상태머신을 순수 `core/chess/MoveSelection`(`TapResult` sealed: Select/Clear/Moves/Ignore) 하나로 통합 —
+      각 화면은 `mover` 색만 넘기고 꼬리(적용/채점/승격 다이얼로그)만 담당. MoveSelectionTest 5(선택·해제·재선택·
+      승격 4수). ② **오류 잦은 엔진 로직 구조화**: 상태 공유 레이스(M43)를 "안전이 기본값"인 `feature/common/Coach`로 —
+      전용 엔진 + Mutex 직렬화를 타입 안에 캡슐화(`rememberCoach()`), Play가 수동 배선 없이 `coach.hint/annotate` 호출.
+      **승격 채점 잠재 레이스(coachLock 누락)도 함께 해소**. 109 테스트 전부 통과·APK 빌드.
+- [x] **M48 — 감사 백로그 정리(#3·#4·#9)**: ① **벤치 테스트 게이트 분리** — BotStrengthTest(3.6s)+
+      CoachCalibrationTest(3.8s)를 `RUN_BENCH=true` 환경변수 옵트인으로(게이트 ~11s→~4s, 강도/보정 가드는 유지).
+      ② **feature 독립성** — 두 feature(Play·Profile)가 import하던 `feature/review/ReviewScreen`을
+      `feature/common`으로 이동(sibling-feature 결합 제거). ③ **보드 사이징 헬퍼** — 8곳에 복붙된
+      `BoxWithConstraints{minOf(w,h).coerceAtMost(900.dp)}`를 `ui/board/SquareBoardBox`(BoxScope+side 콜백)로
+      통합, `MaxBoardSide` 상수화, 미사용 Box/BoxWithConstraints import 정리. 109 테스트·APK 빌드.
+      · **의도적 유지(백로그 종료)**: 승격 auto-queen(레슨은 acceptUci로 특정 수 요구, 드릴/복기는 무난한 기본값),
+      Study 동기 annotate(depth=2 빠름 + guessMode 상호배타로 무레이스), CheckmateyApp 오버레이 3중(경미).
 
 ## 결정 로그 (Decision Log)
 

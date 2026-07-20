@@ -1,7 +1,9 @@
 package com.checkmatey.core.puzzle
 
 import com.checkmatey.core.chess.Position
+import com.checkmatey.core.chess.Square
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -48,6 +50,18 @@ class PuzzlesTest {
     }
 
     @Test
+    fun isSolverMoveMatchesOriginAndDestinationIgnoringPromotionChoice() {
+        // Pure grading used by the puzzle + placement screens — locked here instead of in the UI.
+        val p = Puzzle("x", "8/P7/8/8/8/8/8/k1K5 w - - 0 1", listOf("a7a8q"), "승격", 500)
+        val pos = p.position
+        val queening = pos.findMove("a7a8q")!!
+        assertTrue("the solution move grades correct", p.isSolverMove(0, queening))
+        val kingMove = pos.legalMoves().first { it.from == Square.fromName("c1") }
+        assertFalse("a different move is not the solver move", p.isSolverMove(0, kingMove))
+        assertFalse("an out-of-range step is never correct", p.isSolverMove(9, queening))
+    }
+
+    @Test
     fun themesAreLabelledInKorean() {
         val themes = puzzles.map { it.theme }.toSet()
         assertTrue("themes should be Korean labels", themes.any { it.contains("메이트") || it.contains("포크") })
@@ -59,13 +73,7 @@ class PuzzlesTest {
             File("src/main/assets/puzzles.csv"),
             File("app/src/main/assets/puzzles.csv"),
         ).firstOrNull { it.exists() } ?: error("puzzles.csv not found (run tools/puzzles/build_puzzles.py)")
-        return file.useLines { lines ->
-            lines.drop(1).mapNotNull { line ->
-                val c = line.split(",")
-                if (c.size < 5) return@mapNotNull null
-                val rating = c[3].toIntOrNull() ?: return@mapNotNull null
-                Puzzle(c[0], c[1], c[2].split(" ").filter { it.isNotEmpty() }, c[4], rating)
-            }.toList()
-        }
+        // Parse with the SAME parser the app ships, so the test can't drift from production.
+        return file.useLines { lines -> lines.drop(1).mapNotNull { Puzzle.parse(it) }.toList() }
     }
 }

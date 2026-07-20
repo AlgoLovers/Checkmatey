@@ -1,6 +1,6 @@
 package com.checkmatey.core.puzzle
 
-import android.content.Context
+import com.checkmatey.core.chess.Move
 import com.checkmatey.core.chess.Position
 import kotlin.math.abs
 import kotlin.random.Random
@@ -13,6 +13,9 @@ import kotlin.random.Random
  * reply, then the solver again, … so even indices are the moves the player must find. Storing the
  * verified solution (rather than recomputing it) means our engine's strength never limits which
  * puzzles we can offer, and a test replays every sampled line to prove it's legal.
+ *
+ * Pure Kotlin (no Android): the asset read lives in `data/PuzzleAssets`, so this and the repository
+ * are JVM-unit-testable.
  */
 data class Puzzle(
     val id: String,
@@ -23,22 +26,43 @@ data class Puzzle(
 ) {
     val position: Position get() = Position.fromFen(fen)
 
-    /** The move the player must find first, in UCI. */
-    val firstMoveUci: String get() = solution.first()
+    /**
+     * Is [move] the solver move expected at [step]? Compares origin+destination (the UCI prefix),
+     * ignoring which piece a promotion turns into — the board applies the solution's exact move.
+     * Pure and deterministic, so grading is covered by tests rather than recomputed in the UI.
+     */
+    fun isSolverMove(step: Int, move: Move): Boolean {
+        val uci = solution.getOrNull(step) ?: return false
+        return move.uci().take(4) == uci.take(4)
+    }
+
+    companion object {
+        /** One CSV row -> Puzzle. Columns never contain commas (FEN/UCI use spaces), so split is safe. */
+        fun parse(line: String): Puzzle? {
+            val c = line.split(",")
+            if (c.size < 5) return null
+            val rating = c[3].toIntOrNull() ?: return null
+            val solution = c[2].split(" ").filter { it.isNotEmpty() }
+            if (solution.isEmpty()) return null
+            return Puzzle(id = c[0], fen = c[1], solution = solution, theme = c[4], rating = rating)
+        }
+    }
 }
 
 /**
- * Loads and serves the bundled puzzle set. The CSV (assets/puzzles.csv) is parsed once and cached
- * for the process; 15k rows load in well under a second and the app never repeats a puzzle.
+ * Serves the bundled puzzle set. Pure: it is handed the parsed [puzzles] (see `data/PuzzleAssets`
+ * for the Android asset load), so difficulty selection and lookups are JVM-testable.
  */
-class PuzzleRepository(private val context: Context) {
+class PuzzleRepository(private val puzzles: List<Puzzle>) {
 
-    fun all(): List<Puzzle> = cached ?: load(context).also { cached = it }
+    private val index: Map<String, Puzzle> by lazy { puzzles.associateBy { it.id } }
 
-    fun themes(): List<String> = all().map { it.theme }.distinct()
+    fun all(): List<Puzzle> = puzzles
+
+    fun themes(): List<String> = puzzles.map { it.theme }.distinct()
 
     /** Looks up a puzzle by id — used to re-serve a spaced-repetition review card (see core/srs). */
-    fun byId(id: String): Puzzle? = (index ?: all().associateBy { it.id }.also { index = it })[id]
+    fun byId(id: String): Puzzle? = index[id]
 
     /**
      * Picks the next *new* puzzle. Weakness focus: [themeFilter] restricts to one theme. Otherwise
@@ -51,32 +75,11 @@ class PuzzleRepository(private val context: Context) {
         random: Random = Random.Default,
         themeFilter: String? = null,
     ): Puzzle {
-        val puzzles = all()
         var pool = puzzles.filter { it.id !in solved }
         if (themeFilter != null) pool = pool.filter { it.theme == themeFilter }.ifEmpty { pool }
         if (pool.isEmpty()) pool = puzzles
         // Among puzzles closest to the player's rating, pick randomly for variety.
         val closest = pool.sortedBy { abs(it.rating - rating) }.take(12)
         return closest[random.nextInt(closest.size)]
-    }
-
-    companion object {
-        @Volatile private var cached: List<Puzzle>? = null
-        @Volatile private var index: Map<String, Puzzle>? = null
-
-        private fun load(context: Context): List<Puzzle> =
-            context.assets.open("puzzles.csv").bufferedReader().useLines { lines ->
-                lines.drop(1).mapNotNull { parse(it) }.toList()
-            }
-
-        /** One CSV row -> Puzzle. Columns never contain commas (FEN/UCI use spaces), so split is safe. */
-        private fun parse(line: String): Puzzle? {
-            val c = line.split(",")
-            if (c.size < 5) return null
-            val rating = c[3].toIntOrNull() ?: return null
-            val solution = c[2].split(" ").filter { it.isNotEmpty() }
-            if (solution.isEmpty()) return null
-            return Puzzle(id = c[0], fen = c[1], solution = solution, theme = c[4], rating = rating)
-        }
     }
 }

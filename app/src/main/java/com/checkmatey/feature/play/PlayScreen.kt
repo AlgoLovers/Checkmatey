@@ -3,8 +3,6 @@ package com.checkmatey.feature.play
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -47,10 +45,13 @@ import androidx.compose.ui.unit.dp
 import com.checkmatey.core.chess.Move
 import com.checkmatey.core.chess.Material
 import com.checkmatey.core.chess.PieceColor
+import com.checkmatey.core.chess.MoveSelection
 import com.checkmatey.core.chess.PieceType
 import com.checkmatey.core.chess.Position
+import com.checkmatey.core.chess.Repetition
 import com.checkmatey.core.chess.Square
-import com.checkmatey.core.engine.Annotator
+import com.checkmatey.core.chess.TapResult
+import com.checkmatey.core.chess.koreanName
 import com.checkmatey.core.engine.BotLevel
 import com.checkmatey.core.engine.KotlinMinimaxEngine
 import com.checkmatey.core.engine.MoveAnnotation
@@ -59,11 +60,15 @@ import com.checkmatey.core.engine.Tutor
 import com.checkmatey.core.engine.Threat
 import com.checkmatey.core.study.StudyGames
 import com.checkmatey.data.UserStore
-import com.checkmatey.feature.review.ReviewScreen
-import com.checkmatey.sound.Sfx
+import com.checkmatey.feature.common.rememberCoach
+import com.checkmatey.feature.common.ReviewScreen
 import com.checkmatey.sound.SoundFx
+import com.checkmatey.ui.board.CaptureCallout
 import com.checkmatey.ui.board.CaptureFx
+import com.checkmatey.ui.board.CaptureNote
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.board.SquareBoardBox
+import com.checkmatey.ui.board.moveFeedback
 import com.checkmatey.ui.components.EvalBar
 import com.checkmatey.ui.components.ResponsiveBoardLayout
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +87,9 @@ private val PositionSaver = Saver<Position, String>(save = { it.toFen() }, resto
 @Composable
 fun PlayScreen(modifier: Modifier = Modifier) {
     val engine = remember { KotlinMinimaxEngine() }
-    val annotator = remember { Annotator(engine) }
+    // The coach owns a dedicated engine and serialises its own calls (see [Coach]) — so it can never
+    // race the bot's move search on a shared engine the way it did in M43.
+    val coach = rememberCoach()
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -112,6 +119,8 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     var promotionChoice by remember { mutableStateOf<List<Move>>(emptyList()) }
     // Capture pop effect — sized by the captured piece; counter re-fires repeats on one square.
     var captureFx by remember { mutableStateOf<CaptureFx?>(null) }
+    // Named callout: tells the player *which* piece was just taken, and by whom.
+    var captureNote by remember { mutableStateOf<CaptureNote?>(null) }
     var showCaptured by remember { mutableStateOf(false) }
     val moves = remember { mutableStateListOf<Move>() }
     // Position after every ply (starts with the current position) — powers undo and
@@ -125,9 +134,8 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         return
     }
 
-    // Threefold repetition needs game history, so the screen judges it (core handles the rest).
-    fun repetitionKey(p: Position): String = p.toFen().split(" ").take(4).joinToString(" ")
-    val repetitionDraw = history.count { repetitionKey(it) == repetitionKey(position) } >= 3
+    // Threefold repetition needs the game history the screen keeps; the rule itself lives in core.
+    val repetitionDraw = Repetition.isThreefold(history, position)
     val gameEnded = position.isGameOver() || repetitionDraw
     val drawReason: String? = when {
         position.isCheckmate() -> null
@@ -151,27 +159,18 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     val effectiveLevel = if (adaptive) BotLevel.forRating(userRating) else level
 
     fun applyMove(move: Move) {
-        val victim = position.pieceAt(move.to)?.type ?: if (move.isEnPassant) PieceType.PAWN else null
-        val capture = victim != null
-        position = position.applyMove(move)
+        val fx = moveFeedback(position, move, humanColor, captureFx?.counter ?: 0)
+        position = fx.after
         moves.add(move)
         history.add(position)
         lastMove = move
-        if (victim != null) captureFx = CaptureFx(move.to, victim, (captureFx?.counter ?: 0) + 1)
+        fx.capture?.let { captureFx = it }
+        fx.note?.let { captureNote = it }
         hint = null
         hintStage = 0
         hintLadder = emptyList()
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        if (soundOn) {
-            soundFx.play(
-                when {
-                    position.isCheckmate() -> if (position.sideToMove == humanColor) Sfx.LOSE else Sfx.WIN
-                    position.isInCheck() -> Sfx.CHECK
-                    victim != null -> soundFx.captureFor(victim.letter) // heftier sound for a bigger piece
-                    else -> Sfx.MOVE
-                },
-            )
-        }
+        if (soundOn) soundFx.play(fx.sfx)
     }
 
     fun newGame() {
@@ -186,6 +185,8 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         hintLadder = emptyList()
         feedback = null
         recall = null
+        captureFx = null
+        captureNote = null
         gameOverSeen = false
     }
 
@@ -231,47 +232,39 @@ fun PlayScreen(modifier: Modifier = Modifier) {
 
     fun onSquareClick(square: Square) {
         if (!isHumanTurn) return
-        val current = selected
-        if (current == null) {
-            if (position.pieceAt(square)?.color == humanColor) selected = square
-            return
-        }
-        if (square == current) {
-            selected = null
-            return
-        }
-        val candidates = position.legalMoves().filter { it.from == current && it.to == square }
-        // A promotion offers four pieces — ask instead of silently queening.
-        if (candidates.size > 1 && candidates.all { it.promotion != null }) {
-            promotionChoice = candidates
-            selected = null
-            return
-        }
-        val move = candidates.firstOrNull { it.promotion == null } ?: candidates.firstOrNull { it.promotion == PieceType.QUEEN }
-        if (move != null) {
-            val before = position
-            applyMove(move)
-            selected = null
-            feedback = null
-            recall = null
-            if (coachOn) {
-                scope.launch {
-                    val fb = withContext(Dispatchers.Default) { annotator.annotate(before, move) }
-                    feedback = fb
-                    // "This keeps happening": connect the mistake to the player's weakness history.
-                    recall = if (fb.quality.ordinal >= MoveQuality.MISTAKE.ordinal) {
-                        Tutor.themeOf(fb.reason)?.let { theme ->
-                            store.themeStats()[theme]?.let { (attempts, _) ->
-                                Tutor.recallLine(theme, attempts, store.successRate(theme))
+        when (val r = MoveSelection.onTap(position, selected, square, humanColor)) {
+            is TapResult.Select -> selected = r.square
+            TapResult.Clear -> selected = null
+            TapResult.Ignore -> {}
+            is TapResult.Moves -> {
+                selected = null
+                // A promotion offers four pieces — ask instead of silently queening.
+                if (r.candidates.size > 1 && r.candidates.all { it.promotion != null }) {
+                    promotionChoice = r.candidates
+                    return
+                }
+                val move = r.candidates.firstOrNull { it.promotion == null } ?: r.candidates.first()
+                val before = position
+                applyMove(move)
+                feedback = null
+                recall = null
+                if (coachOn) {
+                    scope.launch {
+                        val fb = coach.annotate(before, move)
+                        feedback = fb
+                        // "This keeps happening": connect the mistake to the player's weakness history.
+                        recall = if (fb.quality.ordinal >= MoveQuality.MISTAKE.ordinal) {
+                            Tutor.themeOf(fb.reason)?.let { theme ->
+                                store.themeStats()[theme]?.let { (attempts, _) ->
+                                    Tutor.recallLine(theme, attempts, store.successRate(theme))
+                                }
                             }
+                        } else {
+                            null
                         }
-                    } else {
-                        null
                     }
                 }
             }
-        } else {
-            selected = if (position.pieceAt(square)?.color == humanColor) square else null
         }
     }
 
@@ -299,7 +292,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
                     if (!isHumanTurn) return@FilledTonalButton
                     if (hintStage == 0) {
                         scope.launch {
-                            val h = withContext(Dispatchers.Default) { annotator.hint(position) }
+                            val h = coach.hint(position)
                             hint = h
                             hintLadder = h?.let { Tutor.hintLadder(position, it) } ?: emptyList()
                             hintStage = if (h != null) 1 else 0
@@ -351,8 +344,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
 
     // The board, sized to fill whatever space it's given (up to a sane cap on huge screens).
     val boardArea: @Composable (Modifier) -> Unit = { sizeMod ->
-        BoxWithConstraints(sizeMod, contentAlignment = Alignment.Center) {
-            val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
+        SquareBoardBox(sizeMod) { side ->
             ChessBoard(
                 position = position,
                 modifier = Modifier.size(side),
@@ -363,6 +355,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
                 onSquareClick = ::onSquareClick,
                 captureEffect = captureFx,
             )
+            CaptureCallout(captureNote, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
         }
     }
 
@@ -479,7 +472,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
                                 applyMove(option)
                                 promotionChoice = emptyList()
                                 feedback = null
-                                if (coachOn) scope.launch { feedback = withContext(Dispatchers.Default) { annotator.annotate(before, option) } }
+                                if (coachOn) scope.launch { feedback = coach.annotate(before, option) }
                             }) { Text(promotionName(type)) }
                         }
                     }
@@ -631,13 +624,7 @@ private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boo
     }
 }
 
-private fun promotionName(type: PieceType): String = when (type) {
-    PieceType.QUEEN -> "퀸 ♛"
-    PieceType.ROOK -> "룩 ♜"
-    PieceType.BISHOP -> "비숍 ♝"
-    PieceType.KNIGHT -> "나이트 ♞"
-    else -> type.name
-}
+private fun promotionName(type: PieceType): String = "${type.koreanName()} ${Material.glyph(type)}"
 
 private fun gameOverMessage(position: Position, humanColor: PieceColor, drawReason: String?): Pair<String, String> = when {
     position.isCheckmate() && position.sideToMove == humanColor -> "패배" to "체크메이트. 컴퓨터가 이겼습니다. 다시 도전해 보세요."

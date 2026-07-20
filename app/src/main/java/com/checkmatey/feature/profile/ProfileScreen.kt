@@ -36,7 +36,7 @@ import com.checkmatey.core.study.PgnParser
 import com.checkmatey.core.study.StudyGame
 import com.checkmatey.core.study.StudyGames
 import com.checkmatey.data.UserStore
-import com.checkmatey.feature.review.ReviewScreen
+import com.checkmatey.feature.common.ReviewScreen
 import com.checkmatey.ui.Sparkline
 
 /**

@@ -3,6 +3,7 @@ package com.checkmatey.core.engine
 import com.checkmatey.core.chess.Position
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /**
@@ -25,6 +26,8 @@ class CoachCalibrationTest {
 
     @Test
     fun gradingMatchesRealBlundersAndVerifiedBestMoves() {
+        // Calibration bench (~3.8s): kept out of the fast gate. Run with `RUN_BENCH=true ./gradlew test…`.
+        assumeTrue("calibration bench — set RUN_BENCH=true to run", System.getenv("RUN_BENCH") == "true")
         val rows = load()
         val annotator = Annotator(KotlinMinimaxEngine(), depth = 4)
 

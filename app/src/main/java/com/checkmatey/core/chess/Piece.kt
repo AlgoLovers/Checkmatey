@@ -18,6 +18,16 @@ enum class PieceType(val letter: Char) {
     KING('k'),
 }
 
+/** Korean name used throughout the coach, tutor, and capture callouts — one source of truth. */
+fun PieceType.koreanName(): String = when (this) {
+    PieceType.PAWN -> "폰"
+    PieceType.KNIGHT -> "나이트"
+    PieceType.BISHOP -> "비숍"
+    PieceType.ROOK -> "룩"
+    PieceType.QUEEN -> "퀸"
+    PieceType.KING -> "킹"
+}
+
 /**
  * A single piece on the board.
  *

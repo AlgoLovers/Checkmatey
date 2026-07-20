@@ -1,8 +1,6 @@
 package com.checkmatey.feature.lesson
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,12 +33,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.checkmatey.core.chess.Move
+import com.checkmatey.core.chess.MoveSelection
+import com.checkmatey.core.chess.TapResult
 import com.checkmatey.core.chess.Position
 import com.checkmatey.core.chess.Square
 import com.checkmatey.core.lesson.Lesson
 import com.checkmatey.core.lesson.Lessons
 import com.checkmatey.data.UserStore
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.board.SquareBoardBox
 import com.checkmatey.ui.components.ResponsiveBoardLayout
 
 /** Endgame drills played against the engine (it defends for real). */
@@ -178,31 +179,23 @@ private fun LessonDetail(lesson: Lesson, onDone: (String) -> Unit, onBack: () ->
 
     fun onSquareClick(square: Square) {
         if (phase != StepPhase.TRYING) return
-        val current = selected
-        if (current == null) {
-            if (basePos.pieceAt(square)?.color == basePos.sideToMove) selected = square
-            return
-        }
-        if (square == current) {
-            selected = null
-            return
-        }
-        val candidates = basePos.legalMoves().filter { it.from == current && it.to == square }
-        val move = candidates.firstOrNull { it.uci() in step.acceptUci }
-            ?: candidates.firstOrNull()
-        if (move == null) {
-            selected = if (basePos.pieceAt(square)?.color == basePos.sideToMove) square else null
-            return
-        }
-        selected = null
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        if (move.uci() in step.acceptUci) {
-            displayPos = basePos.applyMove(move)
-            lastMove = move
-            wrongMsg = null
-            phase = if (stepIndex == lesson.steps.lastIndex) StepPhase.FINISHED else StepPhase.CORRECT
-        } else {
-            wrongMsg = "그 수가 아니에요 — 지시를 다시 읽고 시도해 보세요!"
+        when (val r = MoveSelection.onTap(basePos, selected, square, basePos.sideToMove)) {
+            is TapResult.Select -> selected = r.square
+            TapResult.Clear -> selected = null
+            TapResult.Ignore -> {}
+            is TapResult.Moves -> {
+                selected = null
+                val move = r.candidates.firstOrNull { it.uci() in step.acceptUci } ?: r.candidates.first()
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                if (move.uci() in step.acceptUci) {
+                    displayPos = basePos.applyMove(move)
+                    lastMove = move
+                    wrongMsg = null
+                    phase = if (stepIndex == lesson.steps.lastIndex) StepPhase.FINISHED else StepPhase.CORRECT
+                } else {
+                    wrongMsg = "그 수가 아니에요 — 지시를 다시 읽고 시도해 보세요!"
+                }
+            }
         }
     }
 
@@ -231,8 +224,7 @@ private fun LessonDetail(lesson: Lesson, onDone: (String) -> Unit, onBack: () ->
             }
         },
         board = { m ->
-            BoxWithConstraints(m, contentAlignment = Alignment.Center) {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
+            SquareBoardBox(m) { side ->
                 ChessBoard(
                     position = displayPos,
                     modifier = Modifier.size(side),

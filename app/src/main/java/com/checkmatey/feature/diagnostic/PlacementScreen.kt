@@ -1,8 +1,6 @@
 package com.checkmatey.feature.diagnostic
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -35,13 +33,17 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.checkmatey.core.chess.MoveSelection
 import com.checkmatey.core.chess.Square
+import com.checkmatey.core.chess.TapResult
 import com.checkmatey.core.chess.toSan
 import com.checkmatey.core.diagnostic.Placement
 import com.checkmatey.core.puzzle.Puzzle
 import com.checkmatey.core.puzzle.PuzzleRepository
+import com.checkmatey.data.PuzzleAssets
 import com.checkmatey.data.UserStore
 import com.checkmatey.ui.board.ChessBoard
+import com.checkmatey.ui.board.SquareBoardBox
 import com.checkmatey.ui.components.ResponsiveBoardLayout
 import com.checkmatey.ui.components.GradientPrimaryButton
 
@@ -58,7 +60,7 @@ private enum class Phase { SOLVING, ANSWERED, RESULT }
 fun PlacementScreen(onDone: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val store = remember { UserStore(context) }
-    val repo = remember { PuzzleRepository(context) }
+    val repo = remember { PuzzleRepository(PuzzleAssets.load(context)) }
     val haptic = LocalHapticFeedback.current
 
     var estimate by remember { mutableIntStateOf(Placement.START) }
@@ -108,24 +110,20 @@ fun PlacementScreen(onDone: () -> Unit, modifier: Modifier = Modifier) {
 
     fun onSquareClick(square: Square) {
         if (!canMove) return
-        val current = selected
-        if (current == null) {
-            if (displayPos.pieceAt(square)?.color == solverColor) selected = square
-            return
+        when (val r = MoveSelection.onTap(displayPos, selected, square, solverColor)) {
+            is TapResult.Select -> selected = r.square
+            TapResult.Clear -> selected = null
+            TapResult.Ignore -> {}
+            is TapResult.Moves -> {
+                selected = null
+                val correct = puzzle.isSolverMove(0, r.candidates.first())
+                val expected = displayPos.findMove(puzzle.solution[0]) ?: return
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                answerSan = displayPos.toSan(expected)
+                displayPos = displayPos.applyMove(expected) // show the key move either way
+                grade(correct)
+            }
         }
-        if (square == current) { selected = null; return }
-        val move = displayPos.legalMoves().firstOrNull { it.from == current && it.to == square }
-        if (move == null) {
-            selected = if (displayPos.pieceAt(square)?.color == solverColor) square else null
-            return
-        }
-        selected = null
-        val expected = displayPos.findMove(puzzle.solution[0]) ?: return
-        val correct = move.from == expected.from && move.to == expected.to
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        answerSan = displayPos.toSan(expected)
-        displayPos = displayPos.applyMove(expected) // show the key move either way
-        grade(correct)
     }
 
     if (phase == Phase.RESULT) {
@@ -158,8 +156,7 @@ fun PlacementScreen(onDone: () -> Unit, modifier: Modifier = Modifier) {
             FeedbackCard(phase = phase, correct = lastCorrect, answerSan = answerSan, sideToMove = solverColor)
         },
         board = { m ->
-            BoxWithConstraints(m, contentAlignment = Alignment.Center) {
-                val side = minOf(maxWidth, maxHeight).coerceAtMost(900.dp)
+            SquareBoardBox(m) { side ->
                 ChessBoard(
                     position = displayPos,
                     modifier = Modifier.size(side),

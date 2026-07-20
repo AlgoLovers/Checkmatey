@@ -84,4 +84,25 @@ class AnnotatorTest {
         val annotation = annotator.annotate(pos, nxf5)
         assertTrue("reason should mention a discovered check: ${annotation.reason}", annotation.reason.contains("디스커버드"))
     }
+
+    @Test
+    fun theHintedMoveIsNeverGradedAnythingButBest() {
+        // Invariant behind the "you told me to play this, then called it bad" bug: playing the coach's
+        // own recommended move must always grade BEST. (The live bug was a concurrency race sharing one
+        // engine between the bot and the coach; this locks the single-threaded logic so hint/annotate
+        // can never drift apart in code.)
+        val fens = listOf(
+            "4k3/8/8/8/3q4/8/8/3RK3 w - - 0 1",                              // free queen
+            "6k1/5ppp/8/8/8/8/8/R6K w - - 0 1",                              // back-rank mate
+            "4k3/8/2n5/1p6/8/8/8/4KB2 w - - 0 1",                            // pin + free pawn
+            "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4", // quiet opening
+        )
+        for (fen in fens) {
+            val pos = Position.fromFen(fen)
+            val hint = annotator.hint(pos)
+            assertNotNull("hint should exist for $fen", hint)
+            val graded = annotator.annotate(pos, hint!!.bestMove!!)
+            assertEquals("the hinted move must grade BEST for $fen", MoveQuality.BEST, graded.quality)
+        }
+    }
 }

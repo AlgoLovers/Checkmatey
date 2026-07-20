@@ -2,6 +2,7 @@ package com.checkmatey.core.engine
 
 import com.checkmatey.core.chess.Position
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 import kotlin.random.Random
@@ -22,6 +23,8 @@ class BotStrengthTest {
 
     @Test
     fun levelsFormAMonotonicLadderAndMidLevelsPlayMostlyBest() {
+        // Strength bench (~3.5s): kept out of the fast gate. Run with `RUN_BENCH=true ./gradlew test…`.
+        assumeTrue("strength bench — set RUN_BENCH=true to run", System.getenv("RUN_BENCH") == "true")
         val positions = loadPositions().shuffled(Random(7)).take(40)
         val rng = Random(20260719)
 
