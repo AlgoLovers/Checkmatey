@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.checkmatey.core.habit.DailyGoal
+import com.checkmatey.core.lesson.Lessons
 import com.checkmatey.reminder.DailyReminder
 import com.checkmatey.core.plan.Planner
 import com.checkmatey.core.plan.Progress
@@ -62,7 +63,7 @@ fun HomeScreen(
     val today = remember { System.currentTimeMillis() / 86_400_000L }
     val progress = Progress(
         lessonsDone = store.completedLessons.size,
-        lessonsTotal = 12,
+        lessonsTotal = Lessons.ALL.size,
         puzzlesSolved = store.solvedCount,
         gamesPlayed = games.size,
         hasWeakThemeToDrill = store.recommendedThemes.isNotEmpty(),

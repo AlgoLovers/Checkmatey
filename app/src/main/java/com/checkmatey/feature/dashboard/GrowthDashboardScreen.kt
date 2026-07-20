@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.checkmatey.core.lesson.Lessons
 import com.checkmatey.core.progress.Growth
 import com.checkmatey.core.progress.GrowthReport
 import com.checkmatey.core.progress.ThemeMastery
@@ -56,7 +57,7 @@ fun GrowthDashboardScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             ratingHistory = store.ratingHistory,
             puzzlesSolved = store.solvedCount,
             lessonsDone = store.completedLessons.size,
-            lessonsTotal = 12,
+            lessonsTotal = Lessons.ALL.size,
             gamesPlayed = games.size,
             bestStreak = store.bestStreak,
             masteryPercent = SkillTree.progressPercent(

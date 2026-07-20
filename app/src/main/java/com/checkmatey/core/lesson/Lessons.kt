@@ -58,6 +58,61 @@ object Lessons {
             ),
         ),
         Lesson(
+            id = "notation",
+            title = "기보 읽는 법",
+            subtitle = "N·x·+·O-O·# 기호 읽기",
+            steps = listOf(
+                LessonStep(
+                    fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                    instruction = "기보는 체스의 수를 글자로 적은 기록이에요.\n" +
+                        "대문자 = 기물: N(나이트) · B(비숍) · R(룩) · Q(퀸) · K(킹).\n" +
+                        "폰은 글자 없이 도착 칸만 씁니다.\n" +
+                        "기본형은 '기물 글자 + 도착 칸'. 예: Nf3 = 나이트를 f3로.\n" +
+                        "지금 Nf3을 두세요 (g1 나이트 → f3).",
+                    acceptUci = setOf("g1f3"),
+                    explain = "정확해요! '기물 글자 + 도착 칸'이 기본이에요. 폰만 글자 없이 칸으로 적어요.",
+                ),
+                LessonStep(
+                    fen = "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1",
+                    instruction = "잡는 수에는 x를 넣어요.\n" +
+                        "폰이 잡을 땐 '출발 세로줄 + x + 도착 칸': exd5 = e폰이 d5를 잡음.\n" +
+                        "e4 폰으로 d5의 폰을 잡아보세요 (exd5).",
+                    acceptUci = setOf("e4d5"),
+                    explain = "좋아요! x는 '잡음'이에요. 기물이 잡으면 Nxd5 처럼 기물 글자를 앞에 붙여요.",
+                ),
+                LessonStep(
+                    fen = "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1",
+                    instruction = "상대 킹을 공격하면 '체크'! 기보 끝에 +를 붙여요.\n" +
+                        "퀸을 b5로 보내 대각선으로 킹을 체크하세요 (Qb5+).",
+                    acceptUci = setOf("e2b5"),
+                    explain = "체크! 끝의 +는 '킹에게 체크'라는 표시예요.",
+                ),
+                LessonStep(
+                    fen = "4k3/8/8/8/8/8/8/4K2R w K - 0 1",
+                    instruction = "캐슬링은 특별하게 적어요:\n" +
+                        "O-O = 킹사이드(짧은 쪽), O-O-O = 퀸사이드(긴 쪽).\n" +
+                        "킹사이드 캐슬링(O-O)을 해보세요 — 킹을 g1으로.",
+                    acceptUci = setOf("e1g1"),
+                    explain = "O-O 완성! 킹과 룩이 한 수에 함께 움직이는 유일한 수예요.",
+                ),
+                LessonStep(
+                    fen = "8/4P3/8/8/8/2k5/8/4K3 w - - 0 1",
+                    instruction = "폰이 끝줄에 닿으면 승격! '도착 칸 = 기물'로 적어요. 예: e8=Q.\n" +
+                        "e7 폰을 승격시켜 보세요 (e8=Q).",
+                    acceptUci = setOf("e7e8q"),
+                    explain = "승격 표기 '=Q'! 대부분 퀸으로 승격해요.",
+                ),
+                LessonStep(
+                    fen = "6k1/5ppp/8/8/8/8/8/R6K w - - 0 1",
+                    instruction = "체크메이트는 +가 아니라 #를 붙여요.\n" +
+                        "룩으로 백랭크 체크메이트를 완성하세요 (Ra8#).",
+                    acceptUci = setOf("a1a8"),
+                    explain = "체크메이트 #! 이제 기보를 읽을 수 있어요 — 명국 탭에서 대가들의 수를 직접 따라가 보세요.",
+                    expectMate = true,
+                ),
+            ),
+        ),
+        Lesson(
             id = "pawn",
             title = "폰 다루기",
             subtitle = "전진 · 잡기 · 승격",
