@@ -44,6 +44,13 @@ class KotlinMinimaxEngine : Engine {
         val moves = position.legalMoves()
         if (moves.isEmpty()) return null
         if (moves.size == 1) return moves.first()
+        // In a known opening position, pick among book mainlines — every game starts differently
+        // and the student meets real openings (variety at every level; book moves are all sound).
+        val bookMoves = OpeningBook.moves(position)
+        if (bookMoves.isNotEmpty()) {
+            val pick = bookMoves[random.nextInt(bookMoves.size)]
+            position.findMove(pick.uci)?.let { return it }
+        }
         // Perfect play for the strong levels.
         if (level.blunderChance <= 0.0) return bestMove(position, level.searchDepth)
         val scored = scoredRootMoves(position, level.searchDepth)

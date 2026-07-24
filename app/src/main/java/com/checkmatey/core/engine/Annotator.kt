@@ -75,15 +75,21 @@ class Annotator(private val engine: Engine, private val depth: Int = 4) {
         // exploding (winning slower than mate-in-N is no longer a "blunder"), and the same cp loss
         // matters less in a decided position than in a level one — kinder, truer coaching.
         val drop = winPct(bestValue) - winPct(moveValue)
-        val quality = when {
+        val bookOpening = OpeningBook.openingOf(before, move)
+        var quality = when {
             isBest || drop < 3 -> MoveQuality.BEST
             drop < 8 -> MoveQuality.GOOD
             drop < 15 -> MoveQuality.INACCURACY
             drop < 25 -> MoveQuality.MISTAKE
             else -> MoveQuality.BLUNDER
         }
+        // A known book move is sound by definition — never grade it below GOOD (avoids the
+        // dissonance of "정석인데 부정확?" when the engine merely prefers another line).
+        if (bookOpening != null && quality.ordinal > MoveQuality.GOOD.ordinal) quality = MoveQuality.GOOD
 
-        val reason = if (quality == MoveQuality.BEST || quality == MoveQuality.GOOD) {
+        val reason = if (bookOpening != null) {
+            "📖 ${bookOpening} 정석입니다 — ${reasonFor(before, move)}"
+        } else if (quality == MoveQuality.BEST || quality == MoveQuality.GOOD) {
             reasonFor(before, move)
         } else {
             val betterWhy = best?.let { reasonFor(before, it) }.orEmpty()
