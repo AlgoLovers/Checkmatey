@@ -101,7 +101,8 @@ object Tutor {
         }
         val piece = position.pieceAt(hint.move.from)
         val pieceLine = "움직일 기물: ${piece?.type?.koreanName() ?: "?"} (${hint.move.from.name})"
-        val answer = "${hint.san} — ${hint.reason}"
+        val plan = if (hint.bestLine.size >= 2) "\n🗺 계획: " + hint.bestLine.joinToString(" → ") else ""
+        val answer = "${hint.san} — ${hint.reason}$plan"
         return listOf(question, pieceLine, answer)
     }
 

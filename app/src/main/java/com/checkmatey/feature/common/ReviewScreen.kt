@@ -387,6 +387,13 @@ private fun MoveCard(game: StudyGame, ply: Int, annotation: MoveAnnotation?) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(annotation.reason, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+            if (annotation.bestLine.size >= 2) {
+                Text(
+                    "🗺 계획: " + annotation.bestLine.joinToString(" → "),
+                    style = MaterialTheme.typography.labelMedium,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
