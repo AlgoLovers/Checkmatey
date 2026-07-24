@@ -99,6 +99,27 @@ class KotlinMinimaxEngine : Engine {
     }
 
     /**
+     * The expected line from [position]: run the normal search, then walk the transposition
+     * table's best-move chain. Each step is validated as legal and repetition-guarded, so the
+     * line shown to the student is always playable.
+     */
+    override fun principalVariation(position: Position, depth: Int, maxLen: Int): List<Move> {
+        val first = bestMove(position, depth) ?: return emptyList() // populates the TT
+        val line = mutableListOf(first)
+        var pos = position.applyMove(first)
+        val seen = hashSetOf(ZobristKeys.hash(position))
+        while (line.size < maxLen) {
+            val key = ZobristKeys.hash(pos)
+            if (!seen.add(key)) break
+            val next = tt[key]?.move ?: break
+            val legal = pos.findMove(next.uci()) ?: break
+            line.add(legal)
+            pos = pos.applyMove(legal)
+        }
+        return line
+    }
+
+    /**
      * Every root move scored with a full window at the final depth (exact values, not bounds) —
      * the raw material for human-feeling move sampling. Earlier iterations only order the moves.
      */

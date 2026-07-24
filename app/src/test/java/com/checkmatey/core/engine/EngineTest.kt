@@ -94,6 +94,21 @@ class EngineTest {
     }
 
     @Test
+    fun principalVariationIsALegalLineStartingWithBestMove() {
+        // Mate-in-2: the PV must start with the best move and every step must be legal in sequence.
+        val pos = Position.fromFen("6k1/8/6K1/8/8/8/8/6Q1 w - - 0 1")
+        val best = engine.bestMove(pos, depth = 4)
+        val pv = engine.principalVariation(pos, depth = 4, maxLen = 3)
+        assertTrue("pv must not be empty", pv.isNotEmpty())
+        assertEquals(best, pv.first())
+        var p = pos
+        for (m in pv) {
+            assertTrue("pv move ${'$'}m must be legal", m in p.legalMoves())
+            p = p.applyMove(m)
+        }
+    }
+
+    @Test
     fun playsAShortGameWithoutError() {
         var pos = Position.startingPosition()
         val random = Random(42)

@@ -69,10 +69,15 @@ fun ChessBoard(
     arrows: List<BoardArrow> = emptyList(),
     // A capture "pop" plays at the square whenever the value changes; scale grows with the piece.
     captureEffect: CaptureFx? = null,
+    // True = Black at the bottom (for playing as Black). All geometry respects this.
+    flipped: Boolean = false,
     onSquareClick: ((Square) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier.aspectRatio(1f)) {
         val cell = maxWidth / 8
+        // Visual column/row of a square: White sits at the bottom normally, Black when flipped.
+        fun visX(file: Int) = if (flipped) 7 - file else file
+        fun visY(rank: Int) = if (flipped) rank else 7 - rank
         val glyphSize = with(LocalDensity.current) { (cell * 0.72f).toSp() }
         val coordSize = with(LocalDensity.current) { (cell * 0.20f).toSp() }
 
@@ -87,9 +92,9 @@ fun ChessBoard(
         val animating = lastMove != null && progress.value < 1f
 
         Column(Modifier.fillMaxSize()) {
-            for (rank in 7 downTo 0) {
+            for (rank in if (flipped) 0..7 else 7 downTo 0) {
                 Row(Modifier.weight(1f).fillMaxWidth()) {
-                    for (file in 0..7) {
+                    for (file in if (flipped) 7 downTo 0 else 0..7) {
                         val square = Square(file, rank)
                         val isLight = (file + rank) % 2 == 1
                         val piece = position.pieceAt(square)
@@ -106,14 +111,14 @@ fun ChessBoard(
                         ) {
                             // Coordinate labels on the edges: files along the bottom, ranks on the left.
                             val labelColor = if (isLight) BoardDark else BoardLight
-                            if (rank == 0) {
+                            if (rank == if (flipped) 7 else 0) {
                                 Text(
                                     text = ('a' + file).toString(),
                                     modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 2.dp),
                                     style = TextStyle(fontSize = coordSize, color = labelColor, fontWeight = FontWeight.Bold),
                                 )
                             }
-                            if (file == 0) {
+                            if (file == if (flipped) 7 else 0) {
                                 Text(
                                     text = (rank + 1).toString(),
                                     modifier = Modifier.align(Alignment.TopStart).padding(horizontal = 2.dp),
@@ -149,8 +154,8 @@ fun ChessBoard(
         // Sliding piece overlay.
         if (animating && lastMove != null) {
             position.pieceAt(lastMove.to)?.let { moving ->
-                val x = lerp(cell * lastMove.from.file, cell * lastMove.to.file, progress.value)
-                val y = lerp(cell * (7 - lastMove.from.rank), cell * (7 - lastMove.to.rank), progress.value)
+                val x = lerp(cell * visX(lastMove.from.file), cell * visX(lastMove.to.file), progress.value)
+                val y = lerp(cell * visY(lastMove.from.rank), cell * visY(lastMove.to.rank), progress.value)
                 Box(
                     modifier = Modifier.offset(x = x, y = y).size(cell),
                     contentAlignment = Alignment.Center,
@@ -173,8 +178,8 @@ fun ChessBoard(
                 Canvas(Modifier.matchParentSize()) {
                     val sq = captureEffect.square
                     val center = Offset(
-                        x = (sq.file + 0.5f) * cellPx,
-                        y = (7 - sq.rank + 0.5f) * cellPx,
+                        x = (visX(sq.file) + 0.5f) * cellPx,
+                        y = (visY(sq.rank) + 0.5f) * cellPx,
                     )
                     // Stay fully visible for the first 60% of the animation, then dissolve —
                     // the point is that the player NOTICES the capture, not just a flicker.
@@ -255,8 +260,8 @@ fun ChessBoard(
             Canvas(Modifier.matchParentSize()) {
                 for (arrow in arrows) {
                     fun center(sq: Square) = Offset(
-                        x = (sq.file + 0.5f) * cellPx,
-                        y = (7 - sq.rank + 0.5f) * cellPx,
+                        x = (visX(sq.file) + 0.5f) * cellPx,
+                        y = (visY(sq.rank) + 0.5f) * cellPx,
                     )
                     drawArrow(center(arrow.from), center(arrow.to), arrow.color, cellPx)
                 }

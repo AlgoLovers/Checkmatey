@@ -20,6 +20,14 @@ interface Engine {
         bestMove(position, depth)?.let { it to evaluateMove(position, it, depth) }
 
     /**
+     * The expected line (principal variation) from [position], best move first — the "plan" a
+     * human tutor would sketch: "여기 두면, 상대는 이렇게, 그러면 이렇게". Engines that keep a
+     * transposition table should override this to walk it; the default is just the best move.
+     */
+    fun principalVariation(position: Position, depth: Int, maxLen: Int = 3): List<Move> =
+        bestMove(position, depth)?.let { listOf(it) } ?: emptyList()
+
+    /**
      * Search value of playing [move] from [before], in centipawns from the moving side's
      * perspective (higher = better). Used to score/compare moves for coaching feedback.
      */

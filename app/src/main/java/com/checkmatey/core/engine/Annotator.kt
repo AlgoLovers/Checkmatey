@@ -30,6 +30,8 @@ data class MoveAnnotation(
     val reason: String,
     val bestMove: Move?,
     val bestSan: String?,
+    /** The expected continuation after [bestMove], in SAN — the tutor's "plan" sketch. */
+    val bestLine: List<String> = emptyList(),
 )
 
 /**
@@ -42,9 +44,21 @@ class Annotator(private val engine: Engine, private val depth: Int = 4) {
 
     /** The best move for [position], with an explanation — i.e. a hint. */
     fun hint(position: Position): MoveAnnotation? {
-        val best = engine.bestMove(position, depth) ?: return null
+        val pv = engine.principalVariation(position, depth, maxLen = 3)
+        val best = pv.firstOrNull() ?: return null
         val san = position.toSan(best)
-        return MoveAnnotation(best, san, MoveQuality.BEST, 0, reasonFor(position, best), best, san)
+        return MoveAnnotation(best, san, MoveQuality.BEST, 0, reasonFor(position, best), best, san, sanLine(position, pv))
+    }
+
+    /** SAN for each move of [line] played out from [start]. */
+    private fun sanLine(start: Position, line: List<Move>): List<String> {
+        val sans = ArrayList<String>(line.size)
+        var pos = start
+        for (move in line) {
+            sans.add(pos.toSan(move))
+            pos = pos.applyMove(move)
+        }
+        return sans
     }
 
     /** Judge a move actually played from [before] against the engine's best. */
@@ -77,6 +91,13 @@ class Annotator(private val engine: Engine, private val depth: Int = 4) {
             if (betterSan != null) "더 좋은 수: $betterSan — $betterWhy" else "다른 수가 더 좋았습니다"
         }
 
+        // Sketch the better plan only when the student erred — that's when it teaches.
+        val bestLine = if (quality.ordinal >= MoveQuality.INACCURACY.ordinal && best != null) {
+            sanLine(before, engine.principalVariation(before, depth, maxLen = 3))
+        } else {
+            emptyList()
+        }
+
         return MoveAnnotation(
             move = move,
             san = before.toSan(move),
@@ -85,6 +106,7 @@ class Annotator(private val engine: Engine, private val depth: Int = 4) {
             reason = reason,
             bestMove = best,
             bestSan = best?.let { before.toSan(it) },
+            bestLine = bestLine,
         )
     }
 

@@ -96,7 +96,9 @@ fun PlayScreen(modifier: Modifier = Modifier) {
     val store = remember { UserStore(context) }
     val userRating = remember { store.puzzleRating }
     val soundFx = remember { SoundFx() }
-    val humanColor = PieceColor.WHITE
+    // Which side the human plays — playing Black is how you learn to answer 1.e4! Persisted.
+    var humanColorName by rememberSaveable { mutableStateOf(PieceColor.WHITE.name) }
+    val humanColor = PieceColor.valueOf(humanColorName)
 
     var level by rememberSaveable { mutableStateOf(BotLevel.BEGINNER) }
     // Adaptive on by default so the bot always matches the player without them knowing to toggle it.
@@ -220,7 +222,7 @@ fun PlayScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    LaunchedEffect(position) {
+    LaunchedEffect(position, humanColor) {
         if (position.sideToMove != humanColor && !gameEnded) {
             thinking = true
             val move = withContext(Dispatchers.Default) { engine.chooseMove(position, effectiveLevel, Random.Default) }
@@ -307,6 +309,14 @@ fun PlayScreen(modifier: Modifier = Modifier) {
             Toggle(label = "코치", on = coachOn, onChange = { coachOn = it; if (!it) feedback = null })
             Toggle(label = "적응", on = adaptive, onChange = { adaptive = it })
             Toggle(label = "소리", on = soundOn, onChange = { soundOn = it; store.soundOn = it })
+            Toggle(
+                label = if (humanColor == PieceColor.WHITE) "⚪ 백" else "⚫ 흑",
+                on = humanColor == PieceColor.BLACK,
+                onChange = { black ->
+                    humanColorName = (if (black) PieceColor.BLACK else PieceColor.WHITE).name
+                    newGame() // switching sides starts a fresh game
+                },
+            )
         }
         Spacer(Modifier.height(8.dp))
         // Advantage gauge (full evaluation: material + positioning) + captured pieces, tap for detail.
@@ -580,6 +590,8 @@ private fun RatingSelector(selected: BotLevel, onSelect: (BotLevel) -> Unit) {
     }
 }
 
+private fun colorName(c: PieceColor): String = if (c == PieceColor.WHITE) "백" else "흑"
+
 @Composable
 private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boolean, isStart: Boolean, drawReason: String?) {
     val scheme = MaterialTheme.colorScheme
@@ -604,13 +616,13 @@ private fun StatusCard(position: Position, humanColor: PieceColor, thinking: Boo
         win -> "체크메이트 — 승리 🎉"
         draw -> "무승부 — $drawReason"
         thinking -> "컴퓨터가 생각 중…"
-        position.isInCheck() -> "체크! — 당신(백) 차례"
-        position.sideToMove == humanColor -> "당신(백) 차례"
-        else -> "컴퓨터(흑) 차례"
+        position.isInCheck() && position.sideToMove == humanColor -> "체크! — 당신(${colorName(humanColor)}) 차례"
+        position.sideToMove == humanColor -> "당신(${colorName(humanColor)}) 차례"
+        else -> "컴퓨터(${colorName(humanColor.opposite())}) 차례"
     }
     val sub = when {
         loss || win || draw -> "'새 게임'으로 다시 시작하세요"
-        isStart -> "새 게임 · 흰 기물을 탭해 첫 수를 두세요"
+        isStart -> if (humanColor == PieceColor.WHITE) "새 게임 · 흰 기물을 탭해 첫 수를 두세요" else "새 게임 · 흑 진영 — 컴퓨터(백)가 먼저 둡니다"
         else -> "${position.fullmoveNumber}수째"
     }
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = container, contentColor = onContainer) {
