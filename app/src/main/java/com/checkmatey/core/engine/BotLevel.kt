@@ -14,9 +14,9 @@ enum class BotLevel(
     val blunderChance: Double,
 ) {
     SEEDLING("새싹", 400, 1, 0.60),
-    BEGINNER("초급", 700, 2, 0.35),
-    INTERMEDIATE("중급", 1000, 3, 0.15),
-    CHALLENGER("도전", 1300, 4, 0.05),
+    BEGINNER("초급", 700, 2, 0.40),
+    INTERMEDIATE("중급", 1000, 3, 0.30),
+    CHALLENGER("도전", 1300, 4, 0.20),
     EXPERT("전문가", 1600, 5, 0.0),
     MASTER("마스터", 1900, 6, 0.0);
 
